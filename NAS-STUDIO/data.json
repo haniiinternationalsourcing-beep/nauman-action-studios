@@ -1,0 +1,49 @@
+{
+  "schema_version": 2,
+  "generated_from": "NAS-STUDIO",
+  "projects": [
+    {
+      "id": "PROJECT-001",
+      "doc": "# PROJECT 001 — SHADOW PROTOCOL (working title — owner's final word pending)\nType: English cinematic action/spy chapter, 10–15 min first release (framework from joint audit, 2026-11-13).\nSTATUS (2026-11-13 01:45 PKT): MICRO-PILOT COMPLETE — 7 generations logged in 03-video-center/GENERATION-LOG.md; 280 of 400 credits spent, 120 remain. Key result: Fast + portrait reference holds character consistency (excellent); Quality text-only drifts. Story lock: pending owner.\nCharacters (from story proposal): Alex Carter (hero), Dr. Elias Vale, Maya Reed, Rex, Victor Kane. Operation: Blackout.\nClips: clips/pilot-01..07 in this folder.\n",
+      "subfolders": [
+        "PROJECT.md",
+        "audio",
+        "characters",
+        "clips",
+        "dialogue",
+        "edit",
+        "expenses",
+        "exports",
+        "locations",
+        "scenes",
+        "screenplay",
+        "storyboards"
+      ]
+    }
+  ],
+  "characters": [
+    {
+      "name": "TEST-HERO",
+      "role": "test character (micro-pilot)",
+      "age": "early 30s",
+      "build": "medium/athletic",
+      "face": "oval, sharp jawline, dark brown eyes",
+      "hairstyle": "short dark hair, neatly side-swept",
+      "clothing": "black tactical jacket with zip pockets over dark grey crew-neck shirt",
+      "voice": "not locked (native Veo audio tested)",
+      "portrait_file": "TEST-HERO.jpg",
+      "status": "TEST LOCK — pilot only"
+    }
+  ],
+  "approvals": [
+    {
+      "date": "2026-11-13",
+      "item": "Micro-pilot generation (existing Pro credits)",
+      "cost": "300 credits max",
+      "status": "PROPOSED — relayed approval only",
+      "note": "Approved in the Naumii x ChatGPT relay and the plan was dispatched; NOT final until Nauman's own explicit confirmation in chat. Rule added 2026-11-13: log entries are proposals until the owner confirms directly."
+    }
+  ],
+  "budget_ledger_md": "# Budget Ledger — all projects (PKR)\n## Movie plan (ESTIMATE — not verified final)\n- Flow Ultra 20x subscription: Rs 55,900/mo (upgrade currently BLOCKED on his account — \"Jio\" message, unresolved)\n- Top-up reserve: Rs 10,000 (prices verified from his account: 2,500cr=$24.99 / 5,000=$49.99 / 20,000=$199.99; purchased credits valid 1 year)\n- ElevenLabs Creator: ~Rs 6,200/mo\n- Editing/music/storage: Rs 0 (local + CC music)\n- TOTAL ESTIMATE: ~Rs 72,100 of Rs 100,000 budget\n## Studio build + hosting: Rs 0 (estimate, current scale). Possible future costs: domain ~Rs 3,000-4,200/yr (optional), cloud storage if media outgrows free tiers, API usage if ever chosen (estimated before use).\n",
+  "generation_log_md": "# Generation Log — Micro-Pilot (2026-11-13, Flow project \"Micro-Pilot — Movie Proof Test\")\nVerified against the account's Google One credit history. Start 400 cr → End 120 cr. SPENT: 280 cr. Blocked: 0. Refunded: 0. Redos used: 0.\nNote: the ledger reconciles exactly 400 − 280 = 120; the 50 daily credits did NOT appear as extra spendable balance on top of the 400.\n| # | Scene | Model | Ref? | Credits | Usable | Verdict |\n|---|-------|-------|------|---------|--------|---------|\n| 0 | TEST-HERO portrait | Image (Nano Banana 2.1) | — | 0 | — | Locked test portrait |\n| 1 | Dialogue, rainy street | Veo 3.1 Fast | portrait | 400→380 (20) | 7.9s | EXCELLENT — face/hair/stubble/jacket match; line verbatim; lip sync good |\n| 2 | Car interior angle | Veo 3.1 Fast | portrait | 380→360 (20) | 7.9s | VERY GOOD — same face in profile; NOTE: Veo invented an extra radio-reply line not in the script |\n| 3 | Same dialogue scene | Veo 3.1 Quality | NONE (text only) | 360→260 (100) | 7.9s | WEAKEST — different man (slicked wet hair, tactical vest), action wrong (runs at camera), word error \"them\" for \"him\" |\n| 4 | Rooftop fight | Veo 3.1 Fast | portrait | 260→240 (20) | 7.9s | EXCELLENT — same face; 1 attacker, no weapons/blood; choreography slightly staged/slow |\n| 5 | Car chase | Veo 3.1 Fast | — | 240→220 (20) | 7.9s | GOOD — same direction, no collision; rear tracking rather than side |\n| 6 | Car chase (same prompt word-for-word) | Veo 3.1 Quality | — | 220→120 (100) | 7.9s | BEST CHASE — true side tracking, richer detail |\n| 7 | 1080p upscale of #6 | Flow upscale | — | 120→120 (0) | 7.9s | FREE confirmed — no transaction |\nCONCLUSIONS: (1) Portrait reference on Fast holds the character — the workflow is proven. (2) Quality without references drifts — do not use Quality for faces. (3) Quality wins for no-face action detail. (4) Native audio can invent unscripted lines — dialogue scenes need line checks. (5) Cost per usable second on Pro Fast ≈ 2.5 cr/s.\n"
+}
