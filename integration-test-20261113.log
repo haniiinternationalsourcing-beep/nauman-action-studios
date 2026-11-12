@@ -1,0 +1,36 @@
+=== NAS INTEGRATION TEST — 2026-11-13 03:06 PKT ===
+[1] generate_data.py (canonical)
+data.json v2 written: /home/hatch/workspace/nauman-action-studios/tools/../NAS-STUDIO/data.json — projects: 1, characters: 1, approvals: 1
+project record keys: ['code', 'doc', 'id', 'status_note', 'subfolders', 'title']
+code: PROJECT 001 | title: SHADOW PROTOCOL (working title — owner's final word pending)
+status_note present: True
+characters: 1 | approvals: 1 | schema: 2
+[2] export_studio.py
+Export created: /home/hatch/workspace/nauman-action-studios/tools/../NAS-STUDIO/09-backups/NAS-STUDIO-export-20261113-0306.zip — 21 files + MANIFEST.json (21 SHA-256 hashes).
+Restore: python3 restore_studio.py <this.zip> <target-folder>
+[3] restore_studio.py — REAL restore of the new export
+Manifest verified: 21 files, SHA-256 all match.
+On-disk verification: 21 files re-hashed, all match.
+RESTORE COMPLETE — 21 files, 60.6 MB restored to /tmp/nas-restore-proof/NAS-STUDIO; projects: 1, characters: 1; manifest: verified
+[4] independent byte comparison (source tree vs restored tree)
+compared 21 files | mismatches: 0 | extra files in restore: 0
+RESULT: PASS — restored tree is byte-identical to source
+[5] backward compatibility — verify-only on the OLD export (no manifest)
+VERIFY-ONLY PASSED — 21 files; required: all present; projects: 1, characters: 1; manifest: absent (older export)
+[6] safety test — traversal entry must be refused
+RESTORE ABORTED — unsafe entry: path traversal entry: ../evil.txt
+exit code: 1 (expected 1, restore refused)
+[7] restore v2 — restore into a target that ALREADY has a studio tree
+Manifest verified: 21 files, SHA-256 all match.
+On-disk verification: 21 files re-hashed, all match.
+RESTORE COMPLETE — 21 files, 60.6 MB restored to /tmp/nas-restore-proof2/NAS-STUDIO; projects: 1, characters: 1; manifest: verified
+-- second restore over the same target (must auto-backup first):
+Manifest verified: 21 files, SHA-256 all match.
+Existing studio tree backed up before restore: /tmp/NAS-STUDIO-pre-restore-backup-20261113-030837.zip
+On-disk verification: 21 files re-hashed, all match.
+RESTORE COMPLETE — 21 files, 60.6 MB restored to /tmp/nas-restore-proof2/NAS-STUDIO; projects: 1, characters: 1; manifest: verified
+-- pre-restore backup produced: /tmp/NAS-STUDIO-pre-restore-backup-20261113-030837.zip
+Manifest verified: 21 files, SHA-256 all match.
+VERIFY-ONLY PASSED — 22 files; required: all present; projects: 1, characters: 1; manifest: verified
+[8] restore v2 — fresh target still works
+RESTORE COMPLETE — 21 files, 60.6 MB restored to /tmp/nas-restore-proof3/NAS-STUDIO; projects: 1, characters: 1; manifest: verified

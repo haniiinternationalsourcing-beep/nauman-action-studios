@@ -83,3 +83,36 @@ Files changed: the app artifact (red/white/yellow design unchanged).
 5. APR-001 (micro-pilot, 300 cr) remains "Pending owner confirmation" —
    approvals recorded through relays are proposals until the owner confirms
    directly, per the owner's own rule.
+
+## Final testing phase (2026-11-13, later session) — actual results
+- **ZIP attack suite (operator-run, log: security-test-20261113.log):**
+  symlink entry REFUSED; duplicate path REFUSED (with and without a
+  manifest); path traversal REFUSED; pre-restore auto-backup PASS;
+  disk-space guard PASS (simulated 1 MB free → refused before writing);
+  nested poisoned archive restored as inert data, never extracted (0 evil
+  files); regression restores PASS after every change.
+  ONE REAL FAILURE was found and fixed in this phase: the first ZIP-bomb
+  test (300 MB of zeros) was NOT stopped — it filled the test disk,
+  because restore had no size limits. Limits were added (entries ≤10,000;
+  file ≤500 MB; total ≤2 GB; ratio ≤100:1 above 10 MB) and the bomb is
+  now refused before extraction with 0 bytes written.
+- **PBKDF2 upgrade (builder Node harness, 43/43 checks PASS, run twice):**
+  derivation matches the published PBKDF2-HMAC-SHA256 test vector AND
+  Node's crypto.pbkdf2Sync at 1 and 4096 iterations; set/lock/wrong-PIN
+  (blocked, failure logged)/correct-PIN/reload persistence all verified;
+  PIN reset verified; 5-failure 60-second lockout verified; a seeded
+  legacy plain-SHA-256 record migrated to PBKDF2 on successful unlock and
+  the upgrade was written to the audit log. Argon2 was NOT adopted: it is
+  not native to WebCrypto and would need a third-party WASM library.
+- **Larger dataset (adapter):** synthetic schema-v2 data with 3 projects /
+  4 characters / 5 approvals imported through studioToAppData — all cards,
+  APR-S1…S5 IDs and status mappings correct; export of the imported state
+  validates as schema v2. Generator side separately verified at
+  5 projects / 6 characters / 5 approvals.
+- **Live browser testing: PENDING.** Real Android Chrome (owner's phone)
+  and desktop Chrome click-testing cannot be executed by the operator
+  from the server side; harness results are not presented as a
+  substitute. Manual checklists are in PRODUCTION-READINESS.md.
+- **Embedded sync:** RESTORE_DOC re-synced to the final canonical
+  restore_studio.py (free-space guard + streaming extraction included);
+  all three embedded scripts byte-identical to tools/ at the final commit.

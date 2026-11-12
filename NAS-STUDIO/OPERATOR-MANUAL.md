@@ -20,5 +20,5 @@ Read this manual + AGENTS-AND-WORKFLOW.md (07-agents/) + the project folder. You
 - Data file: regenerate the app's view with `tools/generate_data.py` (the canonical version — the app embeds an identical copy). Never hand-edit data.json.
 ## Control Room app rules
 - The header badge always shows DEMO DATA or STUDIO DATA — believe the badge.
-- Approve / Reject / Mark Spent need the Owner PIN unlock. The PIN is stored only as a SHA-256 hash. It is a device-level convenience lock, NOT server security — anyone holding the file's source can bypass it; true accounts need a backend.
+- Approve / Reject / Mark Spent need the Owner PIN unlock. The PIN is stored only as a PBKDF2-HMAC-SHA-256 hash (salt + 210,000 iterations; older plain-SHA-256 records upgrade automatically on the first successful unlock). It is a device-level convenience lock, NOT server security — anyone holding the file's source can bypass it; true accounts need a backend.
 - The app keeps a backup copy of its saved state and recovers from it if the main copy is corrupted; a notice is shown when that happens.

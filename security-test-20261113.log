@@ -1,0 +1,42 @@
+=== NAS RESTORE SECURITY TESTS — 04:36 PKT ===
+[A] symlink entry:
+RESTORE ABORTED — unsafe entry: symlink entry refused: NAS-STUDIO/evil-link
+exit=1
+[B] duplicate path entry:
+RESTORE ABORTED — manifest verification failed: ['NAS-STUDIO/data.json (SHA-256 mismatch)']
+exit=1
+    restored data.json poisoned? no file
+[C] zip bomb (300MB zeros):
+Traceback (most recent call last):
+  File "/home/hatch/workspace/nauman-action-studios/tools/restore_studio.py", line 173, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/home/hatch/workspace/nauman-action-studios/tools/restore_studio.py", line 147, in main
+    f.write(data)
+OSError: [Errno 28] No space left on device
+exit=1
+107M	/tmp/sec-c
+[A2] symlink:
+RESTORE ABORTED — unsafe entry: symlink entry refused: NAS-STUDIO/evil-link
+exit=1
+[B2] duplicate path, NO manifest:
+RESTORE ABORTED — archive limit: duplicate path entries refused: ['NAS-STUDIO/data.json']
+exit=1
+[C2] zip bomb — must refuse BEFORE extracting:
+RESTORE ABORTED — archive limit: suspicious compression ratio: NAS-STUDIO/bomb.bin (1029:1) — possible ZIP bomb
+exit=1
+bytes written: 
+[R] regression — legit export still restores:
+RESTORE COMPLETE — 21 files, 60.6 MB restored to /tmp/sec-r/NAS-STUDIO; projects: 1, characters: 1; manifest: verified
+[D] disk-space guard — simulated low space (1 MB free) must refuse BEFORE writing:
+guard verdict: not enough free space at /tmp: need ~66670010 bytes, only 1048576 free — restore refused before writing anything
+RESULT: PASS — refused on low space
+guard with real space: OK (enough space)
+[E] nested archive — poisoned inner ZIP inside a valid export is inert data:
+nested attack zip built
+RESTORE COMPLETE — 22 files, 60.6 MB restored to /tmp/sec-e/NAS-STUDIO; projects: 1, characters: 1; manifest: verified
+inner.zip restored as data file (not extracted): /tmp/sec-e/NAS-STUDIO/09-backups/inner.zip
+yes
+evil.txt anywhere? 0 (expected 0)
+[R2] regression after streaming change — legit export:
+RESTORE COMPLETE — 21 files, 60.6 MB restored to /tmp/sec-r2/NAS-STUDIO; projects: 1, characters: 1; manifest: verified

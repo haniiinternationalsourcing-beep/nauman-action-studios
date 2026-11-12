@@ -69,6 +69,57 @@ def check_entry_safety(info):
         return f"symlink entry refused: {name}"
     return None
 
+# Decompression-bomb + abuse limits, checked from the ZIP directory BEFORE
+# anything is extracted (added 2026-11-13 after a bomb test filled the disk:
+# the previous version had no size limits at all). Legit studio exports are
+# ~61 MB total with a 25 MB largest file, so these caps are generous.
+MAX_ENTRIES = 10000
+MAX_FILE_BYTES = 500 * 1024 * 1024
+MAX_TOTAL_BYTES = 2 * 1024 * 1024 * 1024
+MAX_RATIO = 100          # uncompressed:compressed, for files over 10 MB
+RATIO_FLOOR_BYTES = 10 * 1024 * 1024
+
+def check_archive_limits(infos):
+    if len(infos) > MAX_ENTRIES:
+        return f"too many entries: {len(infos)} > {MAX_ENTRIES}"
+    seen, dupes = set(), set()
+    for i in infos:
+        if i.filename in seen:
+            dupes.add(i.filename)
+        seen.add(i.filename)
+    if dupes:
+        return f"duplicate path entries refused: {sorted(dupes)}"
+    total = 0
+    for i in infos:
+        if i.file_size > MAX_FILE_BYTES:
+            return f"entry too large: {i.filename} ({i.file_size} bytes)"
+        if (i.file_size > RATIO_FLOOR_BYTES and i.compress_size > 0
+                and i.file_size / i.compress_size > MAX_RATIO):
+            return (f"suspicious compression ratio: {i.filename} "
+                    f"({i.file_size / i.compress_size:.0f}:1) — possible ZIP bomb")
+        total += i.file_size
+    if total > MAX_TOTAL_BYTES:
+        return f"total uncompressed size too large: {total} bytes"
+    return None
+
+def total_uncompressed(infos):
+    return sum(i.file_size for i in infos if i.filename != "MANIFEST.json")
+
+def check_free_space(infos, target):
+    """Refuse BEFORE writing anything when the target volume cannot hold
+    the restored tree plus a 10% margin. (A 2026-11-13 bomb test filled
+    the disk mid-extraction; failing late also leaves a half-written
+    tree, so this check runs before the first byte is written.)"""
+    need = int(total_uncompressed(infos) * 1.1)
+    anchor = target
+    while not os.path.exists(anchor):
+        anchor = os.path.dirname(os.path.abspath(anchor))
+    free = shutil.disk_usage(anchor).free
+    if free < need:
+        return (f"not enough free space at {anchor}: need ~{need} bytes, "
+                f"only {free} free — restore refused before writing anything")
+    return None
+
 def main():
     if len(sys.argv) < 3:
         print(__doc__)
@@ -86,6 +137,11 @@ def main():
         if problem:
             print(f"RESTORE ABORTED — unsafe entry: {problem}")
             return 1
+
+    limit_problem = check_archive_limits(infos)
+    if limit_problem:
+        print(f"RESTORE ABORTED — archive limit: {limit_problem}")
+        return 1
 
     bad_crc = z.testzip()
     if bad_crc:
@@ -123,6 +179,11 @@ def main():
               f"manifest: {'verified' if manifest else 'absent (older export)'}")
         return 0
 
+    space_problem = check_free_space(infos, target)
+    if space_problem:
+        print(f"RESTORE ABORTED — {space_problem}")
+        return 1
+
     existing = os.path.join(target, "NAS-STUDIO")
     if os.path.exists(existing):
         backup_path = backup_existing_tree(target)
@@ -142,11 +203,13 @@ def main():
             continue
         dest = os.path.join(target, info.filename)
         os.makedirs(os.path.dirname(dest), exist_ok=True)
-        data = z.read(info.filename)
-        with open(dest, "wb") as f:
-            f.write(data)
+        # Stream in 1 MB chunks: a large entry never sits fully in memory.
+        # Nested archives are copied as inert data files — a restore never
+        # opens, extracts or executes an archive stored inside the backup.
+        with z.open(info) as src, open(dest, "wb") as out_f:
+            shutil.copyfileobj(src, out_f, 1024 * 1024)
         restored += 1
-        total_bytes += len(data)
+        total_bytes += info.file_size
 
     if manifest:
         bad = []
