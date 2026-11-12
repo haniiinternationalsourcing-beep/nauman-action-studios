@@ -208,8 +208,8 @@
       form.add{display:grid;gap:10px}
       @media(min-width:760px){form.add{grid-template-columns:repeat(4,1fr)} form.add .wide{grid-column:span 2}}
       label.f{display:block;font-size:.8rem;color:var(--faint);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px;font-weight:600}
-      input[type="text"],input[type="number"],select,textarea{width:100%;background:#fbfbfc;border:1px solid var(--line2);border-radius:10px;color:var(--ink);padding:9px 11px;font-family:inherit;font-size:.95rem}
-      input[type="text"]:focus,input[type="number"]:focus,select:focus,textarea:focus{outline:2px solid var(--red);outline-offset:1px;background:#ffffff}
+      input[type="text"],input[type="number"],input[type="password"],select,textarea{width:100%;background:#fbfbfc;border:1px solid var(--line2);border-radius:10px;color:var(--ink);padding:9px 11px;font-family:inherit;font-size:.95rem}
+      input[type="text"]:focus,input[type="number"]:focus,input[type="password"]:focus,select:focus,textarea:focus{outline:2px solid var(--red);outline-offset:1px;background:#ffffff}
       textarea{resize:vertical}
       .checkline-input{display:flex;gap:9px;align-items:flex-start;font-size:.9rem;color:var(--muted)}
       .checkline-input input{width:20px;height:20px;margin-top:2px;flex:none;accent-color:var(--red)}
@@ -234,6 +234,8 @@
       .filepick{display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin-top:12px}
       input[type="file"]{color:var(--muted);font-size:.9rem}
       .foot{margin-top:46px;border-top:1px solid var(--line2);padding-top:16px;color:var(--faint);font-size:.86rem;display:flex;flex-wrap:wrap;gap:6px 22px;justify-content:space-between}
+      .app-notice{border:1px solid #e79a9e;background:#fdeeee;border-radius:var(--radius);padding:13px 17px;color:var(--red-d);font-size:.94rem;margin-bottom:16px}
+      .studio-banner{border:1px solid #a9dfc0;background:#eefaf2;border-radius:var(--radius);padding:13px 17px;color:#146c3c;font-size:.96rem;margin-bottom:16px}
       .hidden{display:none!important}
       .kbd{font-family:"IBM Plex Mono",monospace;font-size:.82em;background:#f1f1f3;border:1px solid var(--line2);border-radius:5px;padding:1px 5px;color:var(--ink)}
 
@@ -252,6 +254,7 @@
         </div>
         <div class="mast-meta">
           <span class="chip demo"><span class="dot" style="background:var(--amber)"></span>Dataset: <b>DEMO — sample records only</b></span>
+          <span class="chip" id="datasetBadge"><span class="dot" style="background:var(--yellow)"></span>Dataset flag: <b id="datasetBadgeText">DEMO DATA</b></span>
           <span class="chip"><span class="dot"></span>Phase 1 build: <b>Master Control · Projects · Characters · Budget</b></span>
           <span class="chip warn"><span class="dot"></span>Real studio data: <b>never in this public build</b></span>
           <span class="chip"><span class="dot"></span><span id="persistLabel">Saved locally · device only · not encrypted</span></span>
@@ -271,6 +274,8 @@
     </nav>
 
     <div class="wrap">
+      <div id="appNotice" class="app-notice hidden" role="alert"></div>
+      <div id="studioBanner" class="studio-banner hidden"><b>Studio data loaded from NAS-STUDIO — real records, not demo data.</b> The projects, characters and approvals below come from the owner's studio folder, loaded locally on this device.</div>
       <!-- ================= MASTER CONTROL ================= -->
       <section role="tabpanel" id="panel-master">
         <div class="sec-head"><h2>Master Control</h2><span class="phase-tag">Phase 1 · Live</span><span class="stchip st-working">Working</span></div>
@@ -291,7 +296,10 @@
               <tr><td data-l="Feature">Automatic persistence (localStorage)</td><td data-l="Status"><span class="stchip st-working">Working</span></td><td data-l="Meaning">State saves on every change and restores on reload. Device-local only — not cloud backup, not encrypted.</td></tr>
               <tr><td data-l="Feature">Project Library &amp; Character Studio (add / edit in session)</td><td data-l="Status"><span class="stchip st-working">Working</span></td><td data-l="Meaning">Records added here persist on this device and flow into the totals and exports.</td></tr>
               <tr><td data-l="Feature">Budget ledger + pre-generation estimator</td><td data-l="Status"><span class="stchip st-working">Working</span></td><td data-l="Meaning">Ledger math and estimates run live; the approval gate below is enforced in code.</td></tr>
-              <tr><td data-l="Feature">Approvals queue — approve / reject workflow</td><td data-l="Status"><span class="stchip st-working">Working</span></td><td data-l="Meaning">Owner decisions are recorded in the app; a paid ledger line can only be marked Spent against an Approved approval ID. Blocks are written to the audit log.</td></tr>
+              <tr><td data-l="Feature">Approvals queue — approve / reject workflow</td><td data-l="Status"><span class="stchip st-working">Working</span></td><td data-l="Meaning">Owner decisions are recorded in the app; a paid ledger line can only be marked Spent against an Approved approval ID. Blocks are written to the audit log. Approve / Reject also require the Owner Lock below to be unlocked.</td></tr>
+              <tr><td data-l="Feature">Owner Lock (PIN gate on approvals &amp; spending)</td><td data-l="Status"><span class="stchip st-partial">Partially Working</span></td><td data-l="Meaning">Approve, Reject and Mark Spent require an owner unlock — only the PIN's SHA-256 hash is stored, on this device. Client-side lock: stops casual use on a shared device; it is not server-grade security and can be bypassed by anyone with the file's source.</td></tr>
+              <tr><td data-l="Feature">Hardened local storage (validation + backup copy)</td><td data-l="Status"><span class="stchip st-working">Working</span></td><td data-l="Meaning">Every save is shape-validated and mirrored to a backup key; if the main save is corrupt on load, the app recovers from the backup and shows a visible notice.</td></tr>
+              <tr><td data-l="Feature">Studio data import (generate_data.py adapter)</td><td data-l="Status"><span class="stchip st-working">Working</span></td><td data-l="Meaning">A NAS-STUDIO <span class="kbd">data.json</span> (schema v2) is mapped into the app by <span class="kbd">studioToAppData</span> and flagged STUDIO DATA — kept clearly separate from the demo dataset.</td></tr>
               <tr><td data-l="Feature">Schema v2 export / restore (JSON)</td><td data-l="Status"><span class="stchip st-working">Working</span></td><td data-l="Meaning">Exports and restores the exact schema <span class="kbd">generate_data.py</span> produces (schema_version 2, projects[] + characters[] always present).</td></tr>
               <tr><td data-l="Feature">Control Room data export (ZIP)</td><td data-l="Status"><span class="stchip st-working">Working</span></td><td data-l="Meaning">Built-in ZIP writer in vanilla JS — no CDN, works offline. App data only; <b style="color:var(--ink)">not</b> a full studio backup.</td></tr>
               <tr><td data-l="Feature">Full studio backup (folder, scripts, portraits, media)</td><td data-l="Status"><span class="stchip st-manual">Manual</span></td><td data-l="Meaning">Made by the <span class="kbd">export_studio.py</span> tool on the owner's machine — the app cannot zip the studio folder. See Data Vault.</td></tr>
@@ -302,6 +310,28 @@
               <tr><td data-l="Feature">Encrypted / cloud sync of app data</td><td data-l="Status"><span class="stchip st-planned">Planned</span></td><td data-l="Meaning">Not implemented. Local saves are plain device storage; real backups are the exported files the owner keeps.</td></tr>
             </tbody>
           </table></div>
+        </div>
+
+        <div class="card" style="margin-top:22px">
+          <div class="card-head"><h3>Owner Lock — Approval &amp; Spending Gate</h3><span class="stchip st-partial">Partially Working</span></div>
+          <p style="color:var(--muted);margin-top:0" id="lockStatus">Status: —</p>
+          <div class="btnrow" style="align-items:center;margin-top:2px">
+            <input type="password" id="pinInput" placeholder="Owner PIN" autocomplete="off" style="max-width:220px" />
+            <button class="btn" type="button" id="btnSetPin">Set Owner PIN</button>
+            <button class="btn" type="button" id="btnUnlock">Unlock</button>
+            <button class="btn grey hidden" type="button" id="btnLock">Lock</button>
+            <button class="btn danger hidden" type="button" id="btnResetPin">Reset PIN</button>
+          </div>
+          <p class="msg" id="lockMsg"></p>
+          <p class="msg err" id="pinCountdown"></p>
+          <div id="pinResetConfirm" class="hidden" style="border:1px solid #e79a9e;background:#fdeeee;border-radius:12px;padding:13px 15px;margin-top:6px">
+            <p style="margin:0 0 9px;color:var(--red-d)"><b>Reset the Owner PIN on this device?</b> This removes the stored PIN hash from this browser only. It is an owner-convenience reset for this device — <b>not</b> account recovery — and the reset is written to the audit log. Until a new PIN is set, anyone using this device can approve.</p>
+            <div class="btnrow" style="margin-top:0">
+              <button class="btn danger" type="button" id="btnConfirmPinReset">Confirm PIN reset</button>
+              <button class="btn grey" type="button" id="btnCancelPinReset">Cancel</button>
+            </div>
+          </div>
+          <p style="color:var(--muted);font-size:.9rem;margin-bottom:0">Only the PIN's <b style="color:var(--ink)">SHA-256 hash</b> is stored on this device — never the PIN itself. The unlocked state lives in this tab's session only, and ends when you Lock or close the tab. After 5 failed unlock attempts, PIN entry locks for 60 seconds, and every failed attempt is written to the audit log. <b style="color:var(--ink)">Honest limit:</b> this is a client-side owner lock. It stops casual use on a shared device — it is not server-grade security; anyone with the file's source can bypass it. True multi-user authentication needs a backend.</p>
         </div>
 
         <div class="grid2" style="margin-top:22px">
@@ -331,6 +361,8 @@
             <div class="card">
               <div class="card-head"><h3>Approvals Queue</h3><span class="stchip st-working">Working</span></div>
               <p style="color:var(--muted);margin-top:0">This is a real workflow, not a display. Use <b style="color:var(--ink)">Approve</b> or <b style="color:var(--ink)">Reject</b> on each pending item. A paid budget line can be marked Spent <b style="color:var(--ink)">only</b> when it references an approval whose status is Approved — a Rejected approval can never unlock a spend, and every blocked attempt is written to the audit log below.</p>
+              <div class="rule-box" id="apprLockBar" style="margin-bottom:11px">Owner Lock status: —</div>
+              <p class="msg" id="apprLockMsg"></p>
               <div id="approvalList"></div>
               <div class="rule-box"><b>Standing rule:</b> entries in <span class="kbd">approvals-log.csv</span> are PROPOSED until the owner's explicit confirmation. The 300-credit micro-pilot entry (APR-001) stays <b>pending owner confirmation</b> — it is not treated as final approval until the owner approves it here or in his own words.</div>
             </div>
@@ -495,7 +527,7 @@
           <div class="save-note">
             <div class="card-head"><h3>Automatic Persistence — This Device</h3><span class="stchip st-working">Working</span></div>
             <p>Every change in this app — projects, characters, ledger lines, approval decisions, audit entries — is <b>saved automatically to this browser's local storage</b> the moment it happens, and restored when the page is reopened or refreshed. Refresh test: add a record, reload the page — it is still here.</p>
-            <p><b>Saved locally · device only · not encrypted.</b> Local storage belongs to this browser on this device. It is <b>not</b> cloud backup, it does not sync between devices, and clearing browser data deletes it. Your real backup is the exported files below, kept with the studio folder.</p>
+            <p><b>Saved locally · device only · not encrypted.</b> Local storage belongs to this browser on this device. It is <b>not</b> cloud backup, it does not sync between devices, and clearing browser data deletes it. Your real backup is the exported files below, kept with the studio folder. A second backup copy of every save is also kept automatically on this device: if the main save is ever corrupted, the app recovers from that copy on load and shows a visible recovery notice.</p>
             <p class="mono" style="font-size:.8rem" id="persistDetail">Last saved: —</p>
             <div class="btnrow"><button class="btn grey" id="btnReset" type="button">Reset to demo data</button></div>
             <p style="font-size:.88rem;margin-top:8px">Reset clears the local save and restores the original demo dataset.</p>
@@ -515,6 +547,22 @@
           </div>
           <p class="msg" id="vaultMsg"></p>
           <p style="color:var(--muted);font-size:.9rem;margin-bottom:0">Restore accepts exactly the schema <span class="kbd">generate_data.py</span> produces: <span class="kbd">schema_version: 2</span> with <span class="kbd">projects[]</span> and <span class="kbd">characters[]</span> arrays — the same schema this app exports, so the round-trip works both ways. Round-trip test: export the ZIP, then restore from it — the studio returns exactly as exported.</p>
+        </div>
+
+        <div class="card" style="margin-top:14px">
+          <div class="card-head"><h3>Integrations — Real Routes, Honest Status</h3><span class="stchip st-partial">Partially Working</span></div>
+          <p style="color:var(--muted);margin-top:0">No fake “Connect” buttons: nothing here simulates a connection or a successful API call. Each route is listed with its real status and what it actually needs before it can run; the buttons either open the real thing or show the honest setup explanation.</p>
+          <div class="tbl-wrap" style="border:none"><table class="stack-table">
+            <thead><tr><th>Service</th><th>Status</th><th>Real route &amp; requirement</th><th></th></tr></thead>
+            <tbody>
+              <tr><td data-l="Service">Google Flow</td><td data-l="Status"><span class="stchip st-manual">Manual</span></td><td data-l="Requirement">No public API. The operator works in Flow in the browser and imports clips by hand. Subscription credits can never be spent via API.</td><td class="num"><button class="btn small grey" type="button" data-integ="flow">Setup details</button></td></tr>
+              <tr><td data-l="Service">Veo via Gemini API</td><td data-l="Status"><span class="stchip st-planned">Planned</span></td><td data-l="Requirement">Separate pay-per-second API billing (not the Flow subscription). Needs a Google AI API key from the owner.</td><td class="num"><button class="btn small grey" type="button" data-integ="veo">Setup details</button></td></tr>
+              <tr><td data-l="Service">ElevenLabs</td><td data-l="Status"><span class="stchip st-planned">Planned</span></td><td data-l="Requirement">Needs the owner's ElevenLabs account + API key. Nothing is generated before both exist.</td><td class="num"><button class="btn small grey" type="button" data-integ="eleven">Setup details</button></td></tr>
+              <tr><td data-l="Service">Kling</td><td data-l="Status"><span class="stchip st-planned">Planned</span></td><td data-l="Requirement">Needs the owner's Kling account / API access. Until then the route is manual: generate on Kling's own site, import clips.</td><td class="num"><button class="btn small grey" type="button" data-integ="kling">Setup details</button></td></tr>
+              <tr><td data-l="Service">GitHub</td><td data-l="Status"><span class="stchip st-working">Working</span></td><td data-l="Requirement">The studio audit repository is published via the GitHub API — this link opens the real repository.</td><td class="num"><a class="btn small grey" href="https://github.com/haniiinternationalsourcing-beep/nauman-action-studios" target="_blank" rel="noopener">Open repository</a></td></tr>
+            </tbody>
+          </table></div>
+          <p class="msg" id="integDetail" style="color:var(--muted)"></p>
         </div>
 
         <div class="card" style="margin-top:14px">
@@ -589,7 +637,7 @@
 
       <footer class="foot">
         <div>NAUMAN ACTION STUDIOS — Control Room · Phase 1 prototype</div>
-        <div>Owner: Nauman Magray · Operator: Muse (Naumii) · Dataset: DEMO</div>
+        <div>Owner: Nauman Magray · Operator: Muse (Naumii) · Dataset: <span id="footDataset">DEMO</span></div>
       </footer>
     </div>
 
@@ -685,9 +733,19 @@
         ]
       };
 
-      /* ==================== STATE + PERSISTENCE ==================== */
+      /* ==================== STATE + PERSISTENCE (hardened) ==================== */
+      /* The main key is UNCHANGED from the previous live build — data the
+         owner already saved under it loads in place; nothing is discarded.
+         Older candidate keys are checked once for migration (see loader). */
       var LS_KEY = "nas-control-room-state-v2";
-      var state = loadPersisted() || JSON.parse(JSON.stringify(DEMO));
+      var LS_BACKUP_KEY = "nas-control-room-state-v2-backup";
+      var LS_PREMIG_KEY = "nas-control-room-state-v2-pre-migration";
+      var LS_PIN_KEY = "nas-control-room-owner-pin-hash";
+      var LS_PIN_META_KEY = "nas-control-room-owner-pin-meta";
+      var SS_UNLOCK_KEY = "nas-owner-unlocked";
+      var LEGACY_KEYS = ["nas-control-room-state-v1", "nas-control-room-state", "nasControlRoomState"];
+      var BOOT_NOTICE = "";
+      var state = null;
 
       function normalizeState(o){
         var s = JSON.parse(JSON.stringify(DEMO));
@@ -716,23 +774,117 @@
         });
         return s;
       }
-      function loadPersisted(){
-        try {
-          var raw = localStorage.getItem(LS_KEY);
-          if (!raw) return null;
-          var o = JSON.parse(raw);
-          if (!o || o.schema_version !== 2 || !Array.isArray(o.projects) || !Array.isArray(o.characters)) return null;
-          return normalizeState(o);
-        } catch(e){ return null; }
+      function validateStateShape(o){
+        return !!o && typeof o === "object" && o.schema_version === 2 &&
+          Array.isArray(o.projects) && Array.isArray(o.characters) &&
+          Array.isArray(o.approvals) && Array.isArray(o.ledger);
+      }
+      function tryParseState(raw){
+        if (!raw) return null;
+        try { var o = JSON.parse(raw); return validateStateShape(o) ? normalizeState(o) : null; }
+        catch(e){ return null; }
+      }
+      function loadInitialState(){
+        var mainRaw = null, backupRaw = null;
+        try { mainRaw = localStorage.getItem(LS_KEY); } catch(e){}
+        try { backupRaw = localStorage.getItem(LS_BACKUP_KEY); } catch(e){}
+        var fromMain = tryParseState(mainRaw);
+        if (fromMain) return { state: fromMain, notice: "", auditMsg: "" };
+        var fromBackup = tryParseState(backupRaw);
+        if (fromBackup){
+          return { state: fromBackup,
+            auditMsg: "Recovered saved data from the automatic backup copy — the main local save was missing or corrupted.",
+            notice: "Storage recovery: the main local save could not be read, so your data was recovered from the automatic backup copy kept on this device." };
+        }
+        if (mainRaw || backupRaw){
+          return { state: JSON.parse(JSON.stringify(DEMO)),
+            auditMsg: "Both the main local save and its backup copy were unreadable — the demo dataset was loaded instead.",
+            notice: "Storage recovery: both the main local save and its backup copy were unreadable, so the app fell back to the demo dataset. Previously saved records on this device could not be recovered — restore from an exported data.json in the Data Vault if you have one." };
+        }
+        /* Migration from a previous build's storage key. A pre-migration
+           backup copy of the old value is kept under its own key BEFORE
+           anything is overwritten. */
+        for (var i=0;i<LEGACY_KEYS.length;i++){
+          var legacyRaw = null;
+          try { legacyRaw = localStorage.getItem(LEGACY_KEYS[i]); } catch(e){}
+          var migrated = tryParseState(legacyRaw);
+          if (migrated){
+            try { localStorage.setItem(LS_PREMIG_KEY, legacyRaw); } catch(e){}
+            return { state: migrated,
+              auditMsg: "Migrated saved data from the previous build's storage key (" + LEGACY_KEYS[i] + ") — a pre-migration backup copy was kept under its own key before anything was overwritten.",
+              notice: "Your saved data from the previous build was migrated automatically — nothing was discarded. A pre-migration backup copy is kept on this device." };
+          }
+        }
+        return { state: JSON.parse(JSON.stringify(DEMO)), notice: "", auditMsg: "" };
+      }
+      var bootState = loadInitialState();
+      state = bootState.state;
+      if (bootState.auditMsg) state.auditLog.unshift({ when: new Date().toLocaleString(), msg: bootState.auditMsg, kind: "info" });
+      BOOT_NOTICE = bootState.notice || "";
+
+      function showAppNotice(text){
+        var n = document.getElementById("appNotice"); if (!n) return;
+        n.textContent = text; n.classList.remove("hidden");
+      }
+      function showSaveWarning(msg){
+        var el = document.getElementById("persistLabel"); if (el) el.textContent = "Save failed — session only";
+        var d = document.getElementById("persistDetail"); if (d) d.textContent = msg;
+        showAppNotice(msg);
       }
       function persist(){
+        if (!validateStateShape(state)){
+          showSaveWarning("Save skipped: the current state failed validation, so nothing was written — the last good save on this device is untouched. Export from the Data Vault to keep a copy.");
+          return;
+        }
+        var json;
+        try { json = JSON.stringify(state); }
+        catch(e){ showSaveWarning("Save failed: the current state could not be serialized. Changes are kept only for this session — export a data.json from the Data Vault to keep a copy."); return; }
         try {
-          localStorage.setItem(LS_KEY, JSON.stringify(state));
+          localStorage.setItem(LS_KEY, json);
+          try { localStorage.setItem(LS_BACKUP_KEY, json); } catch(e2){ /* main save is good; backup copy best-effort */ }
           var t = new Date();
-          var label = "Saved locally · device only · not encrypted";
-          var el = document.getElementById("persistLabel"); if (el) el.textContent = label;
-          var d = document.getElementById("persistDetail"); if (d) d.textContent = "Last saved: " + t.toLocaleString() + " — this browser, this device only.";
-        } catch(e){ /* storage full/blocked: app keeps working in-session */ }
+          var el = document.getElementById("persistLabel"); if (el) el.textContent = "Saved locally · device only · not encrypted";
+          var d = document.getElementById("persistDetail"); if (d) d.textContent = "Last saved: " + t.toLocaleString() + " — this browser, this device only. A backup copy of this save is kept automatically for recovery.";
+        } catch(e){
+          showSaveWarning("Save failed on this device (browser storage is full or blocked). Changes are kept only for this session — export a data.json from the Data Vault to keep a copy.");
+        }
+      }
+
+      /* ==================== OWNER LOCK (client-side PIN gate) ==================== */
+      function pinHashStored(){ try { return localStorage.getItem(LS_PIN_KEY) || ""; } catch(e){ return ""; } }
+      function isUnlocked(){ try { return sessionStorage.getItem(SS_UNLOCK_KEY) === "1"; } catch(e){ return false; } }
+      function setUnlocked(on){ try { if (on) sessionStorage.setItem(SS_UNLOCK_KEY, "1"); else sessionStorage.removeItem(SS_UNLOCK_KEY); } catch(e){} }
+      function pinMeta(){ try { return JSON.parse(localStorage.getItem(LS_PIN_META_KEY) || "{}") || {}; } catch(e){ return {}; } }
+      function savePinMeta(m){ try { localStorage.setItem(LS_PIN_META_KEY, JSON.stringify(m)); } catch(e){} }
+      function pinLockSecondsLeft(){
+        var m = pinMeta();
+        var left = Math.ceil(((m.lockUntil || 0) - Date.now()) / 1000);
+        return left > 0 ? left : 0;
+      }
+      function sha256Hex(text){
+        if (window.crypto && crypto.subtle && crypto.subtle.digest){
+          return crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)).then(function(buf){
+            return Array.prototype.map.call(new Uint8Array(buf), function(b){ return ("0" + b.toString(16)).slice(-2); }).join("");
+          });
+        }
+        /* Fallback only for contexts where WebCrypto is unavailable: a plain
+           non-crypto hash — the PIN itself is still never stored. */
+        var h1 = 0x811c9dc5, h2 = 0x01000193, out = "";
+        for (var r=0;r<4;r++){
+          for (var i=0;i<text.length;i++){ h1 = Math.imul(h1 ^ text.charCodeAt(i), 0x01000193) >>> 0; h2 = Math.imul(h2 ^ (text.charCodeAt(i) + i + r), 0x85ebca6b) >>> 0; }
+          out += ("0000000" + h1.toString(16)).slice(-8) + ("0000000" + h2.toString(16)).slice(-8);
+        }
+        return Promise.resolve(out);
+      }
+      /* The gate every owner-only action passes through. While locked it
+         changes nothing, shows a visible notice and logs the attempt. */
+      function requireUnlock(actionLabel){
+        if (isUnlocked()) return true;
+        audit("BLOCKED (owner locked): " + actionLabel + " — owner unlock required. Nothing was changed.", "blocked");
+        showAppNotice("Owner unlock required — “" + actionLabel + "” was blocked and written to the audit log. Unlock in Master Control → Owner Lock.");
+        var lm = document.getElementById("lockMsg");
+        if (lm){ lm.textContent = "Owner unlock required — blocked attempt logged: " + actionLabel + "."; lm.className = "msg err"; }
+        return false;
       }
 
       /* ==================== HELPERS ==================== */
@@ -884,6 +1036,11 @@
         Array.prototype.forEach.call(document.querySelectorAll("[data-appr]"), function(b){
           b.addEventListener("click", function(){
             var a = state.approvals[Number(b.getAttribute("data-appr"))];
+            if (!requireUnlock("Approve " + a.id)){
+              renderAll();
+              var lm = $("apprLockMsg"); if (lm){ lm.textContent = "Owner unlock required — the Approve attempt on " + a.id + " changed nothing and was written to the audit log."; lm.className = "msg err"; }
+              return;
+            }
             a.status = "Approved";
             audit("APPROVED: " + a.id + " — " + a.title, "ok");
             renderAll();
@@ -892,6 +1049,11 @@
         Array.prototype.forEach.call(document.querySelectorAll("[data-rej]"), function(b){
           b.addEventListener("click", function(){
             var a = state.approvals[Number(b.getAttribute("data-rej"))];
+            if (!requireUnlock("Reject " + a.id)){
+              renderAll();
+              var lm = $("apprLockMsg"); if (lm){ lm.textContent = "Owner unlock required — the Reject attempt on " + a.id + " changed nothing and was written to the audit log."; lm.className = "msg err"; }
+              return;
+            }
             a.status = "Rejected";
             audit("REJECTED: " + a.id + " — " + a.title + ". It can never become Spent.", "blocked");
             renderAll();
@@ -962,6 +1124,11 @@
           btn.addEventListener("click", function(){
             var row = state.ledger[Number(btn.getAttribute("data-spend"))];
             var m = $("ledgerActionMsg");
+            if (!requireUnlock("Mark Spent — “" + row.item + "”")){
+              renderAll();
+              var m0 = $("ledgerActionMsg"); m0.textContent = "Owner unlock required — this Mark Spent attempt on “" + row.item + "” changed nothing and was written to the audit log. Unlock in Master Control → Owner Lock."; m0.className = "msg err";
+              return;
+            }
             var reason = spendBlockReason(row);
             if (reason){
               audit("BLOCKED Spent attempt: “" + row.item + "” (" + fmt(row.amount) + ") — " + reason + ".", "blocked");
@@ -1000,9 +1167,9 @@
 
       /* ==================== VAULT CONTENT ==================== */
       var TREE = "NAS-STUDIO/\n├── 00-master-control/     MASTER-CONTROL.md · approvals-log.csv · tasks.csv\n├── 01-projects/\n│   └── PROJECT-001/       PROJECT.md · screenplay/ · characters/ · locations/\n│                          scenes/ · storyboards/ · clips/ · dialogue/\n│                          audio/ · edit/ · expenses.csv · exports/\n├── 02-characters/         <name>.json + <name>-portrait.png (locked references)\n├── 03-video-center/       GENERATION-LOG.md · prompts/\n├── 04-voice/              voice-profiles.json · lines/\n├── 05-post-production/    PIPELINE.md · cue-sheets/ · exports/\n├── 06-budget/             budget-ledger.csv · credits-tracker.csv\n├── 07-agents/             AGENTS.md (15 roles, modes, tests)\n├── 08-library/            licence-register.csv · finished films\n├── 09-backups/            studio-backup-YYYYMMDD.zip\n├── OPERATOR-MANUAL.md     any operator or AI can run the studio from this\n└── data.json              generated snapshot, schema v2 (owner's copy — never deployed)";
-      var SCRIPT_GEN = "# generate_data.py — build data.json (schema v2) from the studio registers.\n# Run on the owner's machine inside NAS-STUDIO/. Output stays local.\n# The Control Room restore accepts exactly this schema:\n#   schema_version = 2, generated_from, projects[], characters[],\n#   approvals[], budget_ledger_md, generation_log_md\n# All arrays are ALWAYS present, even when a register is empty.\nimport csv, json, pathlib\n\nROOT = pathlib.Path(__file__).parent\n\ndef read_csv(path):\n    if not path.exists():\n        return []\n    with open(path, newline='', encoding='utf-8') as f:\n        return list(csv.DictReader(f))\n\ndef read_projects():\n    projects = []\n    base = ROOT / '01-projects'\n    if base.exists():\n        for folder in sorted(base.iterdir()):\n            meta = folder / 'project.json'\n            if meta.exists():\n                projects.append(json.loads(meta.read_text(encoding='utf-8')))\n    return projects\n\ndef read_characters():\n    chars = []\n    base = ROOT / '02-characters'\n    if base.exists():\n        for f in sorted(base.glob('*.json')):\n            chars.append(json.loads(f.read_text(encoding='utf-8')))\n    return chars\n\ndef read_text(path):\n    return path.read_text(encoding='utf-8') if path.exists() else ''\n\ndata = {\n    'schema_version': 2,\n    'generated_from': 'generate_data.py — NAS-STUDIO registers',\n    'projects': read_projects(),\n    'characters': read_characters(),\n    'approvals': read_csv(ROOT / '00-master-control' / 'approvals-log.csv'),\n    'budget_ledger_md': read_text(ROOT / '06-budget' / 'budget-ledger.md'),\n    'generation_log_md': read_text(ROOT / '03-video-center' / 'GENERATION-LOG.md'),\n}\n(ROOT / 'data.json').write_text(json.dumps(data, indent=2), encoding='utf-8')\nprint('data.json written (schema v2):', len(data['projects']), 'projects,',\n      len(data['characters']), 'characters,', len(data['approvals']), 'approvals')\n# NOTE: data.json is the owner's working snapshot. Never copy it into\n# the public deployment — the Control Room ships with demo data only.";
-      var SCRIPT_EXP = "# export_studio.py — FULL studio backup: one-command ZIP of the whole folder.\n# Includes scripts, character portraits, production files, clips and media.\n# Creates 09-backups/studio-backup-YYYYMMDD.zip with a restore README.\n# This is the complete backup method — the Control Room's in-app export\n# covers app data only and is NOT a full studio backup.\nimport datetime, pathlib, zipfile\n\nROOT = pathlib.Path(__file__).parent\nstamp = datetime.date.today().strftime('%Y%m%d')\nout = ROOT / '09-backups' / f'studio-backup-{stamp}.zip'\nout.parent.mkdir(exist_ok=True)\nskip = {'09-backups'}\n\nwith zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as z:\n    for p in sorted(ROOT.rglob('*')):\n        if p.is_file() and p.relative_to(ROOT).parts[0] not in skip:\n            z.write(p, p.relative_to(ROOT))\n    z.writestr('README-RESTORE.md',\n        'FULL STUDIO RESTORE\\n'\n        '1. Unzip anywhere — all formats are open (md/csv/json/mp4/png).\\n'\n        '2. Run generate_data.py inside the restored folder to rebuild\\n'\n        '   a schema v2 data.json from the registers.\\n'\n        '3. In the Control Room: Data Vault > Restore > pick data.json.\\n'\n        '4. Check Master Control totals against the pre-backup record.\\n'\n        '5. OPERATOR-MANUAL.md explains every register for a new operator.')\nprint('Full studio backup written:', out)";
-      var RESTORE_DOC = "# Nauman Action Studios — Restore Procedure\n\n## A. Control Room data restore (app data)\n1. Keep the export file untouched as the archive copy; work from a second copy.\n2. Open the Control Room > Data Vault > Restore, and pick the data export ZIP or its data.json.\n3. The app validates schema_version 2 plus projects[] and characters[] arrays before replacing anything — a bad file changes nothing.\n4. After restore, check Master Control totals against README-RESTORE.md inside the export.\n5. The restored state is saved locally on that device and survives refresh.\n\n## B. Full studio restore (folder, scripts, portraits, media)\n1. Keep the studio-backup ZIP (made by export_studio.py) untouched; unzip a second copy anywhere.\n2. Every register is readable without any app: CSV/Markdown registers, JSON character profiles, PNG portraits, MP4 clips.\n3. Run generate_data.py inside the restored folder to rebuild a schema v2 data.json.\n4. Load that data.json in the Control Room via Data Vault > Restore to view it in the app.\n5. OPERATOR-MANUAL.md inside the folder explains every register so any operator or AI can run the studio.\n\n## Schema (v2)\nKeys: schema_version=2, generated_from, projects[], characters[], approvals[], budget_ledger_md, generation_log_md.\nAll arrays are always present. generate_data.py output and Control Room exports are interchangeable.\n";
+      var SCRIPT_GEN = "#!/usr/bin/env python3\n\"\"\"CANONICAL studio data builder — the single source of truth for data.json.\n\nThis exact file is the one embedded in the Control Room app and the one kept\nin tools/. If the two ever differ, THIS disk copy wins and the app copy must\nbe re-synced. (Divergence was audit issue #1, fixed 2026-11-13.)\n\nScans NAS-STUDIO and writes NAS-STUDIO/data.json — schema v2:\n  schema_version, generated_from, projects[], characters[], approvals[],\n  budget_ledger_md, generation_log_md   (ALL keys always present)\n\nRecord compatibility with the Control Room app:\n  - projects[] entries carry the folder fields {id, doc, subfolders} PLUS\n    {code, title, status_note} parsed from PROJECT.md, which the app\'s\n    studioToAppData() adapter maps onto its project cards.\n  - characters[] entries are the character JSON files unchanged (they carry\n    name / role / status + description fields the app displays).\n  - approvals[] entries are the approvals-log.csv rows unchanged\n    {date, item, cost, status, note}.\nLOCAL use only: never upload real output to public hosting.\n\"\"\"\nimport json, os, csv\n\nROOT = os.path.join(os.path.dirname(__file__), \"..\", \"NAS-STUDIO\")\n\ndef read(p):\n    try:\n        with open(p, encoding=\"utf-8\") as f:\n            return f.read()\n    except FileNotFoundError:\n        return \"\"\n\ndef parse_project_doc(doc):\n    \"\"\"Pull a display title + status note out of a PROJECT.md, honestly:\n    title = first \'# \' heading (text after an em dash when present);\n    status_note = first line mentioning STATUS, else empty string.\"\"\"\n    title, status_note = \"\", \"\"\n    for line in doc.splitlines():\n        if not title and line.startswith(\"# \"):\n            heading = line[2:].strip()\n            title = heading.split(\"—\", 1)[1].strip() if \"—\" in heading else heading\n        if not status_note and \"STATUS\" in line.upper():\n            status_note = line.strip()[:160]\n        if title and status_note:\n            break\n    return title, status_note\n\ndata = {\"schema_version\": 2, \"generated_from\": \"NAS-STUDIO\",\n        \"projects\": [], \"characters\": [], \"approvals\": [],\n        \"budget_ledger_md\": \"\", \"generation_log_md\": \"\"}\n\npdir = os.path.join(ROOT, \"01-projects\")\nif os.path.isdir(pdir):\n    for name in sorted(os.listdir(pdir)):\n        full = os.path.join(pdir, name)\n        if os.path.isdir(full):\n            doc = read(os.path.join(full, \"PROJECT.md\"))\n            title, status_note = parse_project_doc(doc)\n            data[\"projects\"].append({\n                \"id\": name,\n                \"code\": name.replace(\"-\", \" \"),\n                \"title\": title or name,\n                \"status_note\": status_note,\n                \"doc\": doc[:4000],\n                \"subfolders\": sorted(os.listdir(full)),\n            })\n\ncdir = os.path.join(ROOT, \"02-characters\")\nif os.path.isdir(cdir):\n    for fn in sorted(os.listdir(cdir)):\n        if fn.endswith(\".json\"):\n            try:\n                with open(os.path.join(cdir, fn), encoding=\"utf-8\") as f:\n                    data[\"characters\"].append(json.load(f))\n            except Exception as e:\n                data[\"characters\"].append({\"file\": fn, \"error\": str(e)})\n\nalog = os.path.join(ROOT, \"00-master-control\", \"approvals-log.csv\")\nif os.path.exists(alog):\n    with open(alog, encoding=\"utf-8\") as f:\n        data[\"approvals\"] = list(csv.DictReader(f))\n\ndata[\"budget_ledger_md\"] = read(os.path.join(ROOT, \"06-budget\", \"BUDGET-LEDGER.md\"))\ndata[\"generation_log_md\"] = read(os.path.join(ROOT, \"03-video-center\", \"GENERATION-LOG.md\"))\n\nout = os.path.join(ROOT, \"data.json\")\nwith open(out, \"w\", encoding=\"utf-8\") as f:\n    json.dump(data, f, indent=2, ensure_ascii=False)\nprint(f\"data.json v2 written: {out} — projects: {len(data[\'projects\'])}, \"\n      f\"characters: {len(data[\'characters\'])}, approvals: {len(data[\'approvals\'])}\")\n";
+      var SCRIPT_EXP = "#!/usr/bin/env python3\n\"\"\"Create a timestamped full-studio ZIP export in NAS-STUDIO/09-backups/.\n\nThe ZIP contains the complete NAS-STUDIO tree (the 09-backups folder itself\nis excluded, as before) PLUS a MANIFEST.json at the ZIP root holding the\nSHA-256 of every file, so restore_studio.py can prove byte-for-byte that\nwhat was exported is what gets restored. Adding the manifest is additive:\nolder restore tools and plain unzippers read the ZIP exactly as before.\n\"\"\"\nimport os, zipfile, datetime, hashlib, json\n\nBASE = os.path.join(os.path.dirname(__file__), \"..\")\nSTUDIO = os.path.join(BASE, \"NAS-STUDIO\")\nstamp = datetime.datetime.now().strftime(\"%Y%m%d-%H%M\")\nout = os.path.join(STUDIO, \"09-backups\", f\"NAS-STUDIO-export-{stamp}.zip\")\n\nentries = []  # (full_path, arcname)\nfor root, dirs, files in os.walk(STUDIO):\n    if \"09-backups\" in root:\n        continue\n    for fn in sorted(files):\n        full = os.path.join(root, fn)\n        entries.append((full, os.path.relpath(full, BASE)))\n\nmanifest = {\"format\": \"nas-studio-export-manifest/1\",\n            \"created\": datetime.datetime.now().isoformat(timespec=\"seconds\"),\n            \"files\": {}}\nfor full, arc in entries:\n    h = hashlib.sha256()\n    with open(full, \"rb\") as f:\n        for chunk in iter(lambda: f.read(1024 * 1024), b\"\"):\n            h.update(chunk)\n    manifest[\"files\"][arc] = h.hexdigest()\n\nwith zipfile.ZipFile(out, \"w\", zipfile.ZIP_DEFLATED) as z:\n    for full, arc in entries:\n        z.write(full, arc)\n    z.writestr(\"MANIFEST.json\", json.dumps(manifest, indent=2))\n\nprint(f\"Export created: {out} — {len(entries)} files + MANIFEST.json \"\n      f\"({len(manifest[\'files\'])} SHA-256 hashes).\")\nprint(\"Restore: python3 restore_studio.py <this.zip> <target-folder>\")\n";
+      var RESTORE_DOC = "#!/usr/bin/env python3\n\"\"\"REAL restore for Nauman Action Studios export ZIPs.\n\nUsage:\n  python3 restore_studio.py <export.zip> <target-folder>\n      Verify the ZIP, then extract it completely and safely into\n      <target-folder> and re-verify every restored file on disk.\n  python3 restore_studio.py <export.zip> --verify-only\n      Verify only, extract nothing (the old behaviour, kept for audits).\n\nSafety:\n  - Entries with absolute paths, \'..\' components or symlink types are\n    REJECTED (zip-slip / link attacks) and abort the restore.\n  - If the ZIP carries MANIFEST.json (exports from 2026-11-13 onward),\n    every file\'s SHA-256 must match the manifest before extraction, and\n    every extracted file is hashed again on disk and compared.\n  - Older ZIPs without a manifest still restore: structure + data.json\n    schema are verified and each file\'s ZIP CRC is checked by zipfile,\n    but the report says plainly that no manifest verification was possible.\n  - If the target already holds a NAS-STUDIO tree, that tree is FIRST\n    backed up to a timestamped ZIP (with SHA-256 manifest) beside the\n    target folder, and only then replaced. A failed backup aborts the\n    restore with the existing tree untouched. Data is never silently lost.\n\"\"\"\nimport sys, os, io, json, zipfile, hashlib, stat, datetime, shutil\n\nREQUIRED = [\"NAS-STUDIO/README.md\", \"NAS-STUDIO/OPERATOR-MANUAL.md\",\n            \"NAS-STUDIO/data.json\",\n            \"NAS-STUDIO/00-master-control/approvals-log.csv\",\n            \"NAS-STUDIO/03-video-center/GENERATION-LOG.md\"]\n\ndef backup_existing_tree(target):\n    \"\"\"Zip the existing <target>/NAS-STUDIO tree (with a SHA-256 manifest)\n    to a timestamped backup BESIDE the target folder. Returns the path.\"\"\"\n    tree_root = os.path.join(target, \"NAS-STUDIO\")\n    stamp = datetime.datetime.now().strftime(\"%Y%m%d-%H%M%S\")\n    parent = os.path.dirname(os.path.abspath(target))\n    out = os.path.join(parent, f\"NAS-STUDIO-pre-restore-backup-{stamp}.zip\")\n    manifest = {}\n    with zipfile.ZipFile(out, \"w\", zipfile.ZIP_DEFLATED) as z:\n        for root, dirs, files in os.walk(tree_root):\n            for fn in sorted(files):\n                full = os.path.join(root, fn)\n                arc = os.path.relpath(full, os.path.abspath(target))\n                h = hashlib.sha256()\n                with open(full, \"rb\") as f:\n                    for chunk in iter(lambda: f.read(1024 * 1024), b\"\"):\n                        h.update(chunk)\n                manifest[arc] = h.hexdigest()\n                z.write(full, arc)\n        z.writestr(\"MANIFEST.json\", json.dumps(\n            {\"format\": \"nas-studio-export-manifest/1\",\n             \"created\": datetime.datetime.now().isoformat(timespec=\"seconds\"),\n             \"files\": manifest}, indent=2))\n    return out\n\ndef sha256_bytes(b):\n    return hashlib.sha256(b).hexdigest()\n\ndef check_entry_safety(info):\n    name = info.filename\n    if name.startswith(\"/\") or name.startswith(\"\\\\\"):\n        return f\"absolute path entry: {name}\"\n    parts = name.replace(\"\\\\\", \"/\").split(\"/\")\n    if \"..\" in parts:\n        return f\"path traversal entry: {name}\"\n    mode = (info.external_attr >> 16) & 0xFFFF\n    if stat.S_ISLNK(mode):\n        return f\"symlink entry refused: {name}\"\n    return None\n\ndef main():\n    if len(sys.argv) < 3:\n        print(__doc__)\n        return 1\n    zip_path = sys.argv[1]\n    verify_only = sys.argv[2] == \"--verify-only\"\n    target = None if verify_only else sys.argv[2]\n\n    z = zipfile.ZipFile(zip_path)\n    infos = [i for i in z.infolist() if not i.is_dir()]\n    names = {i.filename for i in infos}\n\n    for info in infos:\n        problem = check_entry_safety(info)\n        if problem:\n            print(f\"RESTORE ABORTED — unsafe entry: {problem}\")\n            return 1\n\n    bad_crc = z.testzip()\n    if bad_crc:\n        print(f\"RESTORE ABORTED — corrupt entry (CRC): {bad_crc}\")\n        return 1\n\n    missing = [r for r in REQUIRED if r not in names]\n    if missing:\n        print(f\"RESTORE ABORTED — required files missing: {missing}\")\n        return 1\n\n    d = json.loads(z.read(\"NAS-STUDIO/data.json\").decode(\"utf-8\"))\n    if not (d.get(\"schema_version\") == 2 and \"projects\" in d and \"characters\" in d):\n        print(\"RESTORE ABORTED — data.json schema mismatch (need schema_version 2 \"\n              \"with projects[] and characters[])\")\n        return 1\n\n    manifest = None\n    if \"MANIFEST.json\" in names:\n        manifest = json.loads(z.read(\"MANIFEST.json\").decode(\"utf-8\"))[\"files\"]\n        mismatched = []\n        for arc, want in manifest.items():\n            if arc not in names:\n                mismatched.append(f\"{arc} (missing from ZIP)\")\n            elif sha256_bytes(z.read(arc)) != want:\n                mismatched.append(f\"{arc} (SHA-256 mismatch)\")\n        if mismatched:\n            print(f\"RESTORE ABORTED — manifest verification failed: {mismatched}\")\n            return 1\n        print(f\"Manifest verified: {len(manifest)} files, SHA-256 all match.\")\n\n    if verify_only:\n        print(f\"VERIFY-ONLY PASSED — {len(names)} files; required: all present; \"\n              f\"projects: {len(d[\'projects\'])}, characters: {len(d[\'characters\'])}; \"\n              f\"manifest: {\'verified\' if manifest else \'absent (older export)\'}\")\n        return 0\n\n    existing = os.path.join(target, \"NAS-STUDIO\")\n    if os.path.exists(existing):\n        backup_path = backup_existing_tree(target)\n        check = zipfile.ZipFile(backup_path)\n        if check.testzip() is not None:\n            print(f\"RESTORE ABORTED — pre-restore backup {backup_path} failed \"\n                  \"its CRC check; existing tree left untouched.\")\n            return 1\n        print(f\"Existing studio tree backed up before restore: {backup_path}\")\n        shutil.rmtree(existing)\n    os.makedirs(target, exist_ok=True)\n\n    restored = 0\n    total_bytes = 0\n    for info in infos:\n        if info.filename == \"MANIFEST.json\":\n            continue\n        dest = os.path.join(target, info.filename)\n        os.makedirs(os.path.dirname(dest), exist_ok=True)\n        data = z.read(info.filename)\n        with open(dest, \"wb\") as f:\n            f.write(data)\n        restored += 1\n        total_bytes += len(data)\n\n    if manifest:\n        bad = []\n        for arc, want in manifest.items():\n            p = os.path.join(target, arc)\n            h = hashlib.sha256()\n            with open(p, \"rb\") as f:\n                for chunk in iter(lambda: f.read(1024 * 1024), b\"\"):\n                    h.update(chunk)\n            if h.hexdigest() != want:\n                bad.append(arc)\n        if bad:\n            print(f\"RESTORE FAILED — on-disk verification mismatch: {bad}\")\n            return 1\n        print(f\"On-disk verification: {len(manifest)} files re-hashed, all match.\")\n\n    print(f\"RESTORE COMPLETE — {restored} files, {total_bytes/1e6:.1f} MB restored to \"\n          f\"{target}/NAS-STUDIO; projects: {len(d[\'projects\'])}, \"\n          f\"characters: {len(d[\'characters\'])}; \"\n          f\"manifest: {\'verified\' if manifest else \'absent (older export — CRC + schema verified only)\'}\")\n    return 0\n\nif __name__ == \"__main__\":\n    sys.exit(main())\n";
 
       /* ==================== EXPORT / RESTORE ==================== */
       function toCSV(rows, cols){
@@ -1022,9 +1189,11 @@
       function buildExport(){
         var payload = JSON.parse(JSON.stringify(state));
         payload.schema_version = 2;
-        payload.generated_from = "Nauman Action Studios Control Room — app export (schema v2)";
-        payload.budget_ledger_md = ledgerToMd();
-        payload.generation_log_md = genLogToMd();
+        payload.generated_from = state.dataset === "studio"
+          ? "NAS-STUDIO studio data (loaded into the Control Room via studioToAppData) — app export (schema v2)"
+          : "Nauman Action Studios Control Room — app export (schema v2)";
+        payload.budget_ledger_md = state.ledger.length ? ledgerToMd() : (state.budget_ledger_md || ledgerToMd());
+        payload.generation_log_md = state.generationLog.length ? genLogToMd() : (state.generation_log_md || genLogToMd());
         payload.exportedAt = new Date().toISOString();
         return payload;
       }
@@ -1057,9 +1226,120 @@
           vaultMsg("The built-in ZIP writer failed on this browser, so the same export files were downloaded individually instead: data.json + 4 CSV registers + README-RESTORE.md. Nothing was lost.", false);
         }
       }
+      /* ==================== STUDIO IMPORT ADAPTER ==================== */
+      /* Maps a generate_data.py data.json (NAS-STUDIO schema v2) into the
+         app's own state shape. Studio records keep their real fields; the
+         two markdown registers are parsed into the ledger / generation-log
+         panels that display them, and also kept verbatim for export. */
+      function mdTableRows(md){
+        if (!md) return [];
+        var rows = [];
+        String(md).split(/\r?\n/).forEach(function(line){
+          line = line.trim();
+          if (line.charAt(0) !== "|") return;
+          var cells = line.split("|").slice(1, -1).map(function(c){ return c.trim(); });
+          if (!cells.length) return;
+          var sep = cells.every(function(c){ return /^:?-{2,}:?$/.test(c.replace(/\s+/g, "")); });
+          if (sep) return;
+          rows.push(cells);
+        });
+        return rows;
+      }
+      function isHeaderRow(cells, keys){
+        var joined = cells.join(" ").toLowerCase();
+        return keys.some(function(k){ return joined.indexOf(k) !== -1; });
+      }
+      function studioLedgerFromMd(md){
+        var out = [];
+        mdTableRows(md).forEach(function(cells){
+          if (isHeaderRow(cells, ["item", "amount", "category"])) return;
+          var amount = 0;
+          for (var i=1;i<cells.length;i++){
+            if (/^[0-9][0-9,]*(\.[0-9]+)?$/.test(cells[i])){ amount = Number(cells[i].replace(/,/g, "")); break; }
+          }
+          var st = "Proposed";
+          cells.forEach(function(c){ if (/^spent$/i.test(c)) st = "Spent"; else if (/^committed$/i.test(c)) st = "Committed"; else if (/^proposed$/i.test(c)) st = "Proposed"; });
+          var paid = cells.some(function(c){ return /^(yes|paid|true)$/i.test(c); });
+          var appr = "";
+          cells.forEach(function(c){ if (/^APR-[A-Za-z0-9-]+$/.test(c)) appr = c; });
+          out.push({ item: cells[0] || "Studio ledger line", cat: cells[1] || "NAS-STUDIO", amount: amount, state: st, paid: paid, approvalId: appr });
+        });
+        return out;
+      }
+      function studioGenLogFromMd(md){
+        var out = [];
+        mdTableRows(md).forEach(function(cells){
+          if (isHeaderRow(cells, ["shot", "tool", "credits", "result"])) return;
+          var credits = 0;
+          cells.forEach(function(c){ if (/^[0-9][0-9,]*$/.test(c)) credits = Number(c.replace(/,/g, "")); });
+          out.push({ n: out.length + 1, shot: cells[1] || cells[0] || "Studio generation", tool: cells[2] || "NAS-STUDIO", credits: credits, result: cells[4] || cells[3] || "" });
+        });
+        return out;
+      }
+      function studioToAppData(studioJson){
+        var out = {
+          schema_version: 2,
+          dataset: "studio",
+          generated_from: "NAS-STUDIO — generate_data.py data.json (real studio records, loaded locally by the owner)",
+          studio: studioJson.studio || { name: "Nauman Action Studios", tagline: "Creating Cinematic Worlds with AI", owner: "Nauman Magray", operator: "Muse (Naumii)" }
+        };
+        out.projects = (Array.isArray(studioJson.projects) ? studioJson.projects : []).map(function(p){
+          var ws = {};
+          (Array.isArray(p.subfolders) ? p.subfolders : []).forEach(function(sf){ ws[String(sf)] = "Studio folder"; });
+          if (!Object.keys(ws).length && p.ws && typeof p.ws === "object") ws = p.ws;
+          var status = p.status || "In studio";
+          return { code: p.code || p.id || "PROJECT", title: p.title || "Untitled project", format: p.format || "Studio project",
+            status: status, badge: /complet/i.test(status) ? "b-green" : "b-amber",
+            line: p.status_note || p.line || p.doc || "", ws: ws, doc: p.doc || "" };
+        });
+        out.characters = (Array.isArray(studioJson.characters) ? studioJson.characters : []).map(function(c){
+          if (c.spec && typeof c.spec === "object" && (c.back !== undefined || c.check !== undefined) && c.badge) return c;
+          var spec = {};
+          var skip = { name:1, role:1, status:1, img:1, portrait:1, back:1, backstory:1, description:1, check:1, badge:1, spec:1 };
+          Object.keys(c).forEach(function(k){
+            if (skip[k]) return;
+            var v = c[k];
+            if (typeof v === "string" || typeof v === "number") spec[k.charAt(0).toUpperCase() + k.slice(1)] = String(v);
+          });
+          if (c.spec && typeof c.spec === "object") Object.keys(c.spec).forEach(function(k){ spec[k] = c.spec[k]; });
+          var status = c.status || "Studio profile";
+          return { name: c.name || "Unnamed character", role: c.role || "", img: c.img || c.portrait || "", status: status,
+            badge: /lock/i.test(status) ? "b-green" : "b-amber", spec: spec,
+            back: c.back || c.backstory || c.description || "", check: c.check || "Loaded from the NAS-STUDIO character record." };
+        });
+        out.approvals = (Array.isArray(studioJson.approvals) ? studioJson.approvals : []).map(function(a, i){
+          if (a.id && a.title && a.status && a.text !== undefined && !a.item) return a;
+          var raw = String(a.status || a.state || "");
+          var status = /reject/i.test(raw) ? "Rejected" : ((/approv/i.test(raw) && !/not|pending|propos/i.test(raw)) ? "Approved" : "Pending");
+          var bits = [];
+          if (a.date) bits.push(String(a.date));
+          if (a.cost) bits.push("Cost: " + a.cost);
+          if (a.note) bits.push(String(a.note));
+          if (a.text) bits.push(String(a.text));
+          return { id: "APR-S" + (i + 1), title: a.item || a.title || "Studio approval entry", status: status,
+            text: bits.join(" · "), date: a.date || "", cost: a.cost || "", note: a.note || "" };
+        });
+        out.budget_ledger_md = studioJson.budget_ledger_md || "";
+        out.generation_log_md = studioJson.generation_log_md || "";
+        out.ledger = studioLedgerFromMd(out.budget_ledger_md);
+        out.generationLog = studioGenLogFromMd(out.generation_log_md);
+        out.auditLog = [];
+        return out;
+      }
       function applyData(obj, sourceName){
         if (!obj || obj.schema_version !== 2 || !Array.isArray(obj.projects) || !Array.isArray(obj.characters)){
           vaultMsg("Restore refused: “" + sourceName + "” is not a valid schema v2 studio file (schema_version 2 with projects[] and characters[] arrays is required). Nothing was changed.", false); return;
+        }
+        /* A generate_data.py file carries the studio registers (markdown)
+           but no app-side arrays — route it through the adapter. A Control
+           Room export carries the full app state and restores directly. */
+        var isStudioFile = !Array.isArray(obj.ledger) && !Array.isArray(obj.auditLog);
+        if (isStudioFile){
+          state = normalizeState(studioToAppData(obj));
+          audit("STUDIO DATA LOADED from “" + sourceName + "” (NAS-STUDIO data.json, schema v2) via studioToAppData — real studio records, not demo data.", "ok");
+          renderAll();
+          vaultMsg("Studio data loaded from “" + sourceName + "” — real records from NAS-STUDIO, not demo data. The header badge now reads STUDIO DATA, and exports are labelled as studio exports.", true);
+          return;
         }
         state = normalizeState(obj);
         audit("RESTORED state from “" + sourceName + "” (schema v2).", "ok");
@@ -1119,7 +1399,11 @@
         e.preventDefault();
         var st=$("lf-state").value, paid=$("lf-paid").checked, appr=$("lf-appr").value, m=$("ledgerMsg");
         var row={ item:$("lf-item").value.trim(), cat:"Control Room", amount:Number($("lf-amount").value||0), state:st, paid:paid, approvalId:appr };
-        if (st === "Spent"){
+        if (st === "Spent" && !requireUnlock("Add ledger line as Spent — “" + row.item + "”")){
+          row.state = "Proposed";
+          m.textContent = "Owner unlock required — the line was added as Proposed instead, and the blocked Spent attempt was written to the audit log. Unlock in Master Control → Owner Lock, approve the item, then use Mark Spent.";
+          m.className = "msg err";
+        } else if (st === "Spent"){
           var reason = spendBlockReason(row);
           if (reason){
             row.state = "Proposed";
@@ -1145,13 +1429,151 @@
       $("btnExportJson").addEventListener("click", exportJSON);
       $("btnExportZip").addEventListener("click", exportZIP);
       $("btnReset").addEventListener("click", function(){
-        try { localStorage.removeItem(LS_KEY); } catch(e){}
+        if (!requireUnlock("Reset to demo data")){
+          renderAll();
+          vaultMsg("Owner unlock required — Reset to demo data was blocked and written to the audit log. Unlock in Master Control → Owner Lock first.", false);
+          return;
+        }
+        try { localStorage.removeItem(LS_KEY); localStorage.removeItem(LS_BACKUP_KEY); } catch(e){}
         state = JSON.parse(JSON.stringify(DEMO));
         audit("Dataset reset to the original demo data by the owner.", "info");
         renderAll();
         vaultMsg("Demo dataset restored and saved locally. Any additions, decisions and audit entries from this device were cleared.", true);
       });
       $("restoreFile").addEventListener("change", onRestoreFile);
+
+      /* ==================== OWNER LOCK UI ==================== */
+      var pinTimer = null;
+      function stopPinCountdown(){
+        if (pinTimer){ clearInterval(pinTimer); pinTimer = null; }
+        var cd = $("pinCountdown");
+        if (cd && pinLockSecondsLeft() <= 0) cd.textContent = "";
+      }
+      function startPinCountdown(){
+        if (pinTimer) return;
+        pinTimer = setInterval(function(){
+          var left = pinLockSecondsLeft();
+          var cd = $("pinCountdown");
+          if (cd){ cd.textContent = left > 0 ? "PIN entry locked after 5 failed attempts — try again in " + left + "s." : ""; cd.className = "msg err"; }
+          var bu = $("btnUnlock"), pi = $("pinInput");
+          if (bu) bu.disabled = left > 0;
+          if (pi) pi.disabled = left > 0;
+          if (left <= 0){ stopPinCountdown(); renderLockUI(); }
+        }, 500);
+      }
+      function renderLockUI(){
+        var st = $("lockStatus"); if (!st) return;
+        var hasPin = !!pinHashStored(), unlocked = isUnlocked(), left = pinLockSecondsLeft();
+        st.innerHTML = !hasPin
+          ? 'Status: <b>No PIN set</b> on this device yet — set one to gate approvals and spending behind the owner unlock.'
+          : (unlocked
+            ? 'Status: <b style="color:#146c3c">Unlocked</b> for this tab session — Approve, Reject and Mark Spent are open. Lock, or close the tab, to end the session.'
+            : 'Status: <b style="color:var(--red-d)">Locked</b> — Approve, Reject and Mark Spent are blocked until the owner unlocks.');
+        $("btnSetPin").classList.toggle("hidden", hasPin);
+        $("pinInput").classList.toggle("hidden", unlocked);
+        $("btnUnlock").classList.toggle("hidden", !hasPin || unlocked);
+        $("btnLock").classList.toggle("hidden", !unlocked);
+        $("btnResetPin").classList.toggle("hidden", !hasPin);
+        $("btnUnlock").disabled = left > 0;
+        $("pinInput").disabled = left > 0;
+        var bar = $("apprLockBar");
+        if (bar){
+          bar.innerHTML = !hasPin
+            ? "<b>Owner Lock:</b> no PIN is set on this device yet, so anyone using this device can approve or reject. Set an Owner PIN in the Owner Lock control (Master Control, above) to gate these actions."
+            : (unlocked
+              ? "<b>Owner Lock:</b> <b>unlocked</b> for this tab session — Approve, Reject and Mark Spent are open."
+              : "<b>Owner unlock required</b> — Approve, Reject and Mark Spent are blocked while the Owner Lock is on. Blocked attempts change nothing and are written to the audit log.");
+        }
+        if (left > 0) startPinCountdown(); else stopPinCountdown();
+      }
+      function renderDatasetUI(){
+        var studio = state.dataset === "studio";
+        var b = $("datasetBadgeText"); if (b) b.textContent = studio ? "STUDIO DATA" : "DEMO DATA";
+        var bn = $("studioBanner"); if (bn) bn.classList.toggle("hidden", !studio);
+        var f = $("footDataset"); if (f) f.textContent = studio ? "STUDIO" : "DEMO";
+      }
+      $("btnSetPin").addEventListener("click", function(){
+        var lm = $("lockMsg"), pin = $("pinInput").value.trim();
+        if (pin.length < 4){ lm.textContent = "Choose a PIN of at least 4 characters."; lm.className = "msg err"; return; }
+        sha256Hex(pin).then(function(h){
+          try { localStorage.setItem(LS_PIN_KEY, h); }
+          catch(e){ lm.textContent = "Could not save the PIN hash — browser storage is blocked on this device."; lm.className = "msg err"; return; }
+          savePinMeta({ fails: 0, lockUntil: 0 });
+          setUnlocked(true);
+          $("pinInput").value = "";
+          audit("Owner PIN set on this device (only its SHA-256 hash is stored — never the PIN). This tab session is unlocked.", "ok");
+          renderAll();
+          var m = $("lockMsg"); m.textContent = "Owner PIN set — only its hash is stored on this device. This tab session is now unlocked."; m.className = "msg ok";
+        });
+      });
+      $("btnUnlock").addEventListener("click", function(){
+        var lm = $("lockMsg");
+        if (pinLockSecondsLeft() > 0){ lm.textContent = "PIN entry is locked — wait for the countdown to finish."; lm.className = "msg err"; startPinCountdown(); return; }
+        var pin = $("pinInput").value;
+        if (!pin){ lm.textContent = "Enter the Owner PIN first."; lm.className = "msg err"; return; }
+        sha256Hex(pin).then(function(h){
+          if (h === pinHashStored()){
+            savePinMeta({ fails: 0, lockUntil: 0 });
+            setUnlocked(true);
+            $("pinInput").value = "";
+            audit("Owner unlocked the Control Room for this tab session.", "ok");
+            renderAll();
+            var m = $("lockMsg"); m.textContent = "Unlocked for this tab session. Lock again, or close the tab, when finished."; m.className = "msg ok";
+          } else {
+            var meta = pinMeta();
+            meta.fails = (meta.fails || 0) + 1;
+            if (meta.fails >= 5){
+              meta.lockUntil = Date.now() + 60000; meta.fails = 0;
+              audit("FAILED unlock attempt (5th in a row) — PIN entry locked for 60 seconds.", "blocked");
+            } else {
+              audit("FAILED unlock attempt " + meta.fails + " of 5 — wrong PIN entered.", "blocked");
+            }
+            savePinMeta(meta);
+            renderAll();
+            var m2 = $("lockMsg");
+            m2.textContent = meta.lockUntil && pinLockSecondsLeft() > 0
+              ? "Wrong PIN — 5 failed attempts reached. PIN entry is locked for 60 seconds."
+              : "Wrong PIN — failed attempt logged in the audit log. After 5 in a row, PIN entry locks for 60 seconds.";
+            m2.className = "msg err";
+          }
+        });
+      });
+      $("btnLock").addEventListener("click", function(){
+        setUnlocked(false);
+        audit("Owner locked the Control Room — approvals and spending are gated again.", "info");
+        renderAll();
+        var m = $("lockMsg"); m.textContent = "Locked. Approve, Reject and Mark Spent now require an owner unlock."; m.className = "msg ok";
+      });
+      $("btnResetPin").addEventListener("click", function(){
+        $("pinResetConfirm").classList.remove("hidden");
+        $("lockMsg").textContent = "";
+      });
+      $("btnCancelPinReset").addEventListener("click", function(){
+        $("pinResetConfirm").classList.add("hidden");
+      });
+      $("btnConfirmPinReset").addEventListener("click", function(){
+        try { localStorage.removeItem(LS_PIN_KEY); } catch(e){}
+        savePinMeta({ fails: 0, lockUntil: 0 });
+        setUnlocked(false);
+        $("pinResetConfirm").classList.add("hidden");
+        audit("Owner PIN RESET on this device — the stored PIN hash was removed (owner-convenience reset for this device, not account recovery). Approvals are ungated until a new PIN is set.", "blocked");
+        renderAll();
+        var m = $("lockMsg"); m.textContent = "PIN removed on this device. Anyone using this device can approve until a new Owner PIN is set."; m.className = "msg err";
+      });
+
+      /* ==================== INTEGRATIONS PANEL ==================== */
+      var INTEG_DETAILS = {
+        flow: "Google Flow — setup: there is nothing to connect. The owner signs in to Flow in his own browser, generation happens there on the Pro subscription, and clips are imported into NAS-STUDIO by hand. Flow has no public API, and subscription credits can never be spent through an API.",
+        veo: "Veo via Gemini API — setup: the owner creates a Google AI (Gemini) API key in his own Google account. Billing is separate pay-per-second API billing — it does not draw on the Flow subscription. The key would live only in the operator's local tool configuration, never in this app or the public repo. Status stays Planned until that key exists.",
+        eleven: "ElevenLabs — setup: the owner creates the ElevenLabs account on his own phone first, then generates an API key inside that account. Character voice profiles are built from the locked scripts. Status stays Planned until the account and key exist — nothing is generated before then.",
+        kling: "Kling — setup: needs the owner's Kling account and API access on his plan. Until then, action and motion work stays on the manual route: generate on Kling's own site and import the clips. Status: Planned."
+      };
+      Array.prototype.forEach.call(document.querySelectorAll("[data-integ]"), function(b){
+        b.addEventListener("click", function(){
+          var d = $("integDetail");
+          if (d) d.textContent = INTEG_DETAILS[b.getAttribute("data-integ")] || "";
+        });
+      });
       function dlGen(){ download("generate_data.py", new Blob([SCRIPT_GEN], { type: "text/x-python" })); }
       function dlExp(){ download("export_studio.py", new Blob([SCRIPT_EXP], { type: "text/x-python" })); }
       $("btnDlGen").addEventListener("click", dlGen);
@@ -1194,7 +1616,8 @@
         Array.prototype.forEach.call(document.querySelectorAll(".btn"), function(b){
           if (b.querySelector(".bic")) return;
           var txt = b.textContent.toLowerCase(), n = "plus";
-          if (/approve/.test(txt)) n = "check";
+          if (/pin|unlock|lock/.test(txt)) n = "lock";
+          else if (/approve/.test(txt)) n = "check";
           else if (/reject/.test(txt)) n = "cross";
           else if (/mark spent/.test(txt)) n = "cash";
           else if (/download/.test(txt)) n = "download";
@@ -1208,6 +1631,7 @@
       function renderAll(){
         renderStats(); renderDepts(); renderApprovals(); renderAudit(); renderTasks(); renderGenLog();
         renderProjects(); renderChars(); renderLedger(); renderEstimate(); renderAgents();
+        renderLockUI(); renderDatasetUI();
         iconify();
         persist();
       }
@@ -1215,6 +1639,7 @@
       $("scriptGen").textContent = SCRIPT_GEN;
       $("scriptExp").textContent = SCRIPT_EXP;
       renderAll();
+      if (BOOT_NOTICE) showAppNotice(BOOT_NOTICE);
     </script>
   </body>
 </html>

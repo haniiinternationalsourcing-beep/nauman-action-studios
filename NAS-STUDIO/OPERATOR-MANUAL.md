@@ -14,3 +14,11 @@ Every generation: note credits before/after, model, blocked/refunded, usable sec
 Nothing paid without the owner's approval entry. Estimates are always shown first, in PKR.
 ## If you are a new operator
 Read this manual + AGENTS-AND-WORKFLOW.md (07-agents/) + the project folder. You now know everything the previous operator knew.
+## Backup and restore (post-audit procedure, 2026-11-13)
+- Backup: run `tools/export_studio.py` — it writes a timestamped ZIP into 09-backups/ with a SHA-256 manifest inside. A ZIP without a verified restore is NOT a proven backup.
+- Restore: run `tools/restore_studio.py <export.zip> <target-folder>` — it validates the archive (structure, schema, hashes, path safety), backs up any existing studio tree at the target to a timestamped ZIP first, then restores and re-verifies every file on disk. `--verify-only` checks without extracting.
+- Data file: regenerate the app's view with `tools/generate_data.py` (the canonical version — the app embeds an identical copy). Never hand-edit data.json.
+## Control Room app rules
+- The header badge always shows DEMO DATA or STUDIO DATA — believe the badge.
+- Approve / Reject / Mark Spent need the Owner PIN unlock. The PIN is stored only as a SHA-256 hash. It is a device-level convenience lock, NOT server security — anyone holding the file's source can bypass it; true accounts need a backend.
+- The app keeps a backup copy of its saved state and recovers from it if the main copy is corrupted; a notice is shown when that happens.
