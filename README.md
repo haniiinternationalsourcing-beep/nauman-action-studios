@@ -21,19 +21,25 @@ independent technical audit. Everything is byte-exact as delivered.
   with a checksummed recovery journal + single-restore lock + --recover
   mode, strict path validation incl. Windows drive/UNC/device forms +
   resolve-based containment + exclusive no-follow file creation,
-  fail-closed directory fsyncs (exit 4 on genuine I/O errors),
-  journal bound to its recorded target by canonical path comparison,
+  fail-closed fsyncs with narrow probe-proven unsupported
+  classification (genuine I/O errors exit 4 on every platform),
+  exclusive journal temp creation (planted symlinks refused, stale
+  temps preserved aside), journal bound to its recorded target by
+  canonical path comparison,
   ZIP-bomb + disk-space guards, pre-restore auto-backup; the app's
   embedded copy is byte-identical to this file), `sync_embedded.py`
   (packaging sync), `connectors/README.md` (modular API architecture -
   keys never live in code or this repo).
 - `security-test-20261113.log` / `integration-test-20261113.log` /
-  `fix2-verification-20261113.log` / `fix3-verification-20261113.log` -
+  `fix2-verification-20261113.log` / `fix3-verification-20261113.log` /
+  `fix4-verification-20261113.log` -
   raw test evidence: ZIP attack suite, the export-restore byte-identity
-  proof, the fix-phase-2 crash / journal / lock battery, and the
+  proof, the fix-phase-2 crash / journal / lock battery, the
   fix-phase-3 battery for the Grok-audit findings (Windows paths,
   fsync fault injection, cross-target recovery) with the full
-  T1-T14 regression re-run.
+  T1-T14 regression re-run, and the fix-phase-4 battery (narrow fsync
+  classification with simulated-Windows cases, journal-temp symlink /
+  stale / race tests) with the regression re-run again.
 - `NAS-STUDIO/` - the complete studio folder system: master control
   (TEST-REPORT-2026-11-13.md and PRODUCTION-READINESS.md - every feature
   labelled PASS / FAIL / PENDING honestly), Project 001 with all pilot
