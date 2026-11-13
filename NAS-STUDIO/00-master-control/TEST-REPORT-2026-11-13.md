@@ -261,3 +261,60 @@ Evidence: fix3-verification-20261113.log (kept in the repo).
 - Final restore_studio.py SHA-256:
   e5847a69a4429ddd187a01abed8f875fcd626d4a34709a34d1ea87847f747d14
   (43,719 bytes).
+
+## Fix phase 4 — Grok/ChatGPT findings A+B (2026-11-13, after commit 2ca5678)
+
+Two further findings from the independent review of the fix-phase-3
+commit; owner approved the plan with three safeguard clarifications.
+Baseline before changes: commit 2ca5678c…; restore_studio.py SHA-256
+e5847a69…; real NAS-STUDIO tree aggregate e320d501… (32 files).
+Evidence: fix4-verification-20261113.log.
+
+- Finding A — fsync_dir treated EVERY Windows OSError as unsupported
+  (os.name == 'nt' blanket). Fixed with narrow, positive
+  identification: degradation only for filesystem-level
+  EINVAL/ENOTSUP/EOPNOTSUPP from the fsync itself, or — on Windows —
+  open-time EACCES/EPERM when a one-time CONTROL PROBE on a neutral
+  directory has proven os.open cannot open directory handles for
+  fsync on this platform. The documented limitation is exactly that
+  os.open limitation. EIO/ENOSPC/EROFS/unexpected errors on ANY
+  platform fail closed; EACCES off Windows is genuine too. File-fsync
+  failures are now DurabilityError (exit 4), not raw tracebacks.
+  Tests (fault injection): W1 SIMULATED Windows dir-open
+  PermissionError → degrade + notice, restore completes PASS; W2
+  SIMULATED Windows dir-fsync EIO → exit 4 fail-closed PASS (the
+  fix-3 code silently degraded in this case); N3a/N3b/N3c re-verified
+  under the new code (N3b needed the notice wording kept as
+  'not supported via os.open' — behaviour was already correct).
+  These Windows results are SIMULATIONS (os.name + error injection on
+  Linux), NOT actual Windows testing — recorded as such.
+- Finding B — write_journal opened its fixed-name temp with a plain
+  open('w'): a planted symlink at .nas-restore-journal.json.tmp
+  would have redirected the write outside. Fixed: the temp is
+  created exclusively (O_EXCL + O_NOFOLLOW where available); a
+  pre-existing temp that is a symlink or non-regular is REFUSED
+  untouched; a stale regular temp is preserved by an overwrite-safe,
+  race-safe rename-aside (hardlink claim — an existing destination is
+  never replaced; exclusive-create copy fallback) with SHA-256 + size
+  + exact path printed as evidence; a temp that vanishes mid-write
+  becomes a controlled JournalError refusal (exit 2), never a raw
+  crash. Tests: B1 planted symlink → refused, external victim
+  byte-identical, studio intact PASS; B2 stale temp → preserved
+  aside, restore completes PASS; B2c aside-name collision → existing
+  destination never replaced PASS; Brace TOCTOU (symlink flipper vs
+  200 journal writes) → victim never written, outcomes only success
+  or controlled refusal PASS (run 2 of the race exposed the raw
+  FileNotFoundError that the mid-write guard now converts; both runs
+  are kept in the log).
+- Full regression re-run under fix-4 code: fix-3 battery (N1–N6,
+  T1–T14, ZIP security) — all PASS, with the battery's three known
+  harness defects (T2b/T3/T9) re-verified via the corrected retest
+  script, exactly as in fix phase 3; raw outputs preserved in the
+  log. App regression (embedded sync, PBKDF2/adapter harness) is
+  recorded at the end of fix4-verification-20261113.log.
+- Condition proof: after ALL tests, the real NAS-STUDIO tree
+  aggregate SHA-256 re-measured = e320d501…, identical to the
+  fix-phase-4 baseline. All tests ran in sandboxes.
+- Final restore_studio.py SHA-256:
+  64e9c0a0f8591d63e6bebc8105011c3754e287d7b52c26c31236ac279c1bb927
+  (50,867 bytes).

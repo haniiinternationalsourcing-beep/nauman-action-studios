@@ -36,6 +36,17 @@ PENDING = not yet tested in the required environment. PLANNED = not built.
   with staging/old-tree paths validated against the recorded target's
   parent before any mutation. Full evidence: TEST-REPORT-2026-11-13.md
   (Fix phase 3) and fix3-verification-20261113.log.
+  Fix phase 4 (further review of the fix-phase-3 commit): the Windows
+  fsync classification is now narrow and probe-proven — EACCES is
+  'unsupported' only on Windows when a control probe shows os.open
+  cannot open directory handles there; genuine I/O errors fail closed
+  on every platform, file-fsync failures included (exit 4). The
+  journal temp file is created exclusively (O_EXCL + O_NOFOLLOW): a
+  planted symlink is refused untouched, a stale temp is preserved
+  aside (never overwritten, hash + path recorded). Windows results
+  are simulations, not actual Windows tests. Full evidence:
+  TEST-REPORT-2026-11-13.md (Fix phase 4) and
+  fix4-verification-20261113.log.
 - Restore safety: path traversal refused; symlink refused; duplicate
   paths refused (with/without manifest); ZIP bomb refused pre-extraction
   (ratio/size/entry limits); low-disk-space refused pre-write; nested
@@ -86,6 +97,16 @@ PENDING = not yet tested in the required environment. PLANNED = not built.
   the wrong studio. Fixed with canonical target binding validated
   before any mutation; cross-target and moved-journal tests prove
   refusal, own-target recovery unaffected.
+- fsync_dir classified EVERY Windows error as 'unsupported'
+  (fix-phase-4 review): a genuine Windows I/O failure would have
+  degraded silently. Fixed with probe-proven narrow classification;
+  simulated-Windows tests prove PermissionError degrades while EIO
+  fails closed (exit 4).
+- write_journal's temp file was an unsafe plain open (same review):
+  a planted symlink at the temp path could redirect the write
+  outside the studio folder. Fixed with exclusive no-follow
+  creation, refuse-on-plant, and preserve-aside for stale temps;
+  symlink/race tests prove the external file is never touched.
 
 ## PENDING (not done — do not treat as passed)
 - **Live browser click-testing** in real Android Chrome (owner's Infinix)
