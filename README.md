@@ -19,15 +19,21 @@ independent technical audit. Everything is byte-exact as delivered.
   (backup ZIP with SHA-256 manifest), `restore_studio.py` (REAL restore:
   TWO-directional manifest verification, staged crash-safe extraction
   with a checksummed recovery journal + single-restore lock + --recover
-  mode, path-traversal/symlink/duplicate refusal, ZIP-bomb + disk-space
-  guards, pre-restore auto-backup; the app's embedded copy is
-  byte-identical to this file), `sync_embedded.py`
+  mode, strict path validation incl. Windows drive/UNC/device forms +
+  resolve-based containment + exclusive no-follow file creation,
+  fail-closed directory fsyncs (exit 4 on genuine I/O errors),
+  journal bound to its recorded target by canonical path comparison,
+  ZIP-bomb + disk-space guards, pre-restore auto-backup; the app's
+  embedded copy is byte-identical to this file), `sync_embedded.py`
   (packaging sync), `connectors/README.md` (modular API architecture -
   keys never live in code or this repo).
 - `security-test-20261113.log` / `integration-test-20261113.log` /
-  `fix2-verification-20261113.log` - raw test evidence: ZIP attack suite,
-  the export-restore byte-identity proof, and the fix-phase-2 crash /
-  journal / lock test battery (baseline hashes recorded first).
+  `fix2-verification-20261113.log` / `fix3-verification-20261113.log` -
+  raw test evidence: ZIP attack suite, the export-restore byte-identity
+  proof, the fix-phase-2 crash / journal / lock battery, and the
+  fix-phase-3 battery for the Grok-audit findings (Windows paths,
+  fsync fault injection, cross-target recovery) with the full
+  T1-T14 regression re-run.
 - `NAS-STUDIO/` - the complete studio folder system: master control
   (TEST-REPORT-2026-11-13.md and PRODUCTION-READINESS.md - every feature
   labelled PASS / FAIL / PENDING honestly), Project 001 with all pilot
