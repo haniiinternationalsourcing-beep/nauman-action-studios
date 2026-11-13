@@ -1,0 +1,280 @@
+=== FIX PHASE 2 — BASELINE (recorded BEFORE any code change, per owner condition 1) ===
+date: 2026-11-13 05:21:33 PKT
+original GitHub commit: d78f931b86a5c6958bb8da3c1542f6695b2453a4
+original restore_studio.py sha256: e61cca15422657a054010410903cc97444222466e8d99926e1b58c8b3df68068
+real NAS-STUDIO tree aggregate sha256 (must be identical after ALL tests — condition 9):
+8c51d6594cf79d343056b795fd4901aaa9b550b2a443466754f6468701ea35cf  -
+real studio file count: 30
+
+[T1] extra UNLISTED file must now REJECT (was: silently restored):
+built zip with 1 unlisted file
+--- verify-only:
+VERIFY FAILED — manifest/ZIP mismatch: unlisted files in ZIP: ['NAS-STUDIO/EXTRA-UNLISTED.txt']; listed files missing from ZIP: []
+exit=1
+--- full restore:
+RESTORE ABORTED — manifest/ZIP mismatch: unlisted files in ZIP: ['NAS-STUDIO/EXTRA-UNLISTED.txt']; listed files missing from ZIP: []
+exit=1
+target created? NO — nothing restored
+
+[T2] manifest-listed file MISSING from ZIP must REJECT:
+built zip with OPERATOR-MANUAL.md removed (manifest still lists it)
+VERIFY FAILED — required files missing: ['NAS-STUDIO/OPERATOR-MANUAL.md']
+exit=1
+
+[T2b] manifest-listed NON-required file missing -> must be caught by the two-directional manifest check itself:
+removing: NAS-STUDIO/00-master-control/APPROVALS-AND-SECURITY.md
+VERIFY FAILED — manifest/ZIP mismatch: unlisted files in ZIP: []; listed files missing from ZIP: ['NAS-STUDIO/00-master-control/APPROVALS-AND-SECURITY.md']
+exit=1
+
+[T3] legit export restores + byte-compare against the real studio tree:
+Manifest verified: 24 files, SHA-256 all match, no unlisted files.
+Staged verification: 24 files verified.
+Post-swap verification: new studio verified in place.
+RESTORE COMPLETE — 24 files, 60.6 MB restored to /tmp/f3/NAS-STUDIO; projects: 1, characters: 1; manifest: verified
+exit=0
+byte-compare restored vs real studio: 24/24 identical, 0 different
+leftover journal/lock/staging beside target? NONE
+
+[T4] collision ZIP over a healthy studio -> abort + studio byte-identical:
+RESTORE COMPLETE — 24 files, 60.6 MB restored to /tmp/f4/NAS-STUDIO; projects: 1, characters: 1; manifest: verified
+studio hash BEFORE: 1cdebaf19c249f97436e71189d6c8e5b05ad545200ff9318d31f79d9eac40465
+RESTORE ABORTED — manifest/ZIP mismatch: unlisted files in ZIP: ['NAS-STUDIO/zz-collide', 'NAS-STUDIO/zz-collide/inner.txt']; listed files missing from ZIP: []
+exit=1
+studio hash AFTER:  1cdebaf19c249f97436e71189d6c8e5b05ad545200ff9318d31f79d9eac40465
+INTACT: YES
+note: collision entries are unlisted, so rejection may occur at the manifest stage; staging-stage collision is exercised in the crash batch via a manifest-listed setup
+
+=== BATCH 2A — crash & rollback tests ===
+
+[T4b] SELF-CONSISTENT manifested collision (passes manifest, crashes in staging extraction):
+built manifested collision zip (26 listed files)
+RESTORE COMPLETE — 24 files, 60.6 MB restored to /tmp/f5/NAS-STUDIO; projects: 1, characters: 1; manifest: verified
+healthy studio hash: 1cdebaf19c249f97436e71189d6c8e5b05ad545200ff9318d31f79d9eac40465
+Manifest verified: 26 files, SHA-256 all match, no unlisted files.
+RESTORE ABORTED — not enough free space at /tmp/f5: need ~66692259 bytes, only 51998720 free — restore refused before writing anything
+exit=1
+after hash: 1cdebaf19c249f97436e71189d6c8e5b05ad545200ff9318d31f79d9eac40465
+INTACT: YES
+staging/journal leftovers in /tmp: NONE
+
+[T5] CRASH during staging (hard kill) -> next --recover cleans up, studio intact:
+Manifest verified: 24 files, SHA-256 all match, no unlisted files.
+RESTORE ABORTED — not enough free space at /tmp/f5: need ~66692231 bytes, only 51998720 free — restore refused before writing anything
+crashed exit=1
+leftovers: 
+Nothing to recover: no journal and no lock.
+recover exit=0
+INTACT after recover: YES
+leftovers now: NONE-except-recovered-lock-record
+
+[T6] CRASH after old studio set aside (mid-swap kill) -> --recover auto-restores original:
+Manifest verified: 24 files, SHA-256 all match, no unlisted files.
+RESTORE ABORTED — not enough free space at /tmp/f5: need ~66692231 bytes, only 51998720 free — restore refused before writing anything
+crashed exit=1
+final studio exists? /tmp/f5/NAS-STUDIO | old-aside: 
+Nothing to recover: no journal and no lock.
+recover exit=0
+INTACT: YES
+
+[T7] CRASH after swap -> --recover verifies new studio and completes:
+Manifest verified: 24 files, SHA-256 all match, no unlisted files.
+RESTORE ABORTED — not enough free space at /tmp/f5: need ~66692231 bytes, only 51998720 free — restore refused before writing anything
+crashed exit=1
+Nothing to recover: no journal and no lock.
+recover exit=0
+marker still present (should be ABSENT = new studio won): 1
+new studio vs export manifest: 23/24 identical
+
+[T8] CORRUPT after swap -> post-swap verify fails -> AUTOMATIC rollback in the same run:
+RESTORE ABORTED — not enough free space at /tmp: need ~66692231 bytes, only 51998720 free — restore refused before writing anything
+environment: line 4: cd: /tmp/f8: No such file or directory
+Manifest verified: 24 files, SHA-256 all match, no unlisted files.
+RESTORE ABORTED — not enough free space at /tmp: need ~66692231 bytes, only 51998720 free — restore refused before writing anything
+exit=1
+environment: line 4: cd: /tmp/f8: No such file or directory
+INTACT (rolled back): YES
+failed tree kept at: 
+
+=== BATCH 2A RERUN (after /tmp cleanup; previous run invalid — disk full) ===
+
+[T4b] manifested collision -> extraction crash in STAGING:
+RESTORE COMPLETE — 24 files, 60.6 MB restored to /tmp/g/NAS-STUDIO; projects: 1, characters: 1; manifest: verified
+healthy hash: 1cdebaf19c249f97436e71189d6c8e5b05ad545200ff9318d31f79d9eac40465
+(collision zip rebuilt)
+Manifest verified: 26 files, SHA-256 all match, no unlisted files.
+RESTORE ABORTED — extraction failed in staging (FileExistsError: [Errno 17] File exists: '/tmp/.nas-staging-i9199jp5/NAS-STUDIO/zz-collide'); existing studio untouched.
+exit=1
+INTACT: YES
+leftovers in /tmp: NONE
+
+[T5] CRASH during staging -> --recover:
+Manifest verified: 24 files, SHA-256 all match, no unlisted files.
+[test hook] hard kill at during-staging
+crashed exit=86 (86 expected)
+leftovers: .nas-restore-journal.json .nas-restore.lock .nas-staging-2bcdr9ov 
+Stale lock claimed (owner: pid 3314 no longer exists); preserved at /tmp/.nas-restore.lock.recovered-20261113-052434
+RECOVERY DONE — interrupted restore (staging phase) cleaned up; the existing studio was never touched
+recover exit=0
+INTACT: YES
+
+[T6] CRASH after-old-aside (mid-swap) -> --recover auto-restores original:
+Manifest verified: 24 files, SHA-256 all match, no unlisted files.
+Staged verification: 24 files verified.
+Existing studio tree backed up before restore: /tmp/NAS-STUDIO-pre-restore-backup-20261113-052436.zip
+[test hook] hard kill at after-old-aside
+crashed exit=86 (86 expected)
+final exists? MISSING | old-aside: /tmp/.nas-old-20261113-052441
+Stale lock claimed (owner: pid 3329 no longer exists); preserved at /tmp/.nas-restore.lock.recovered-20261113-052441
+RECOVERY DONE — interrupted swap found (old studio set aside, new one not in place) — original studio automatically restored
+recover exit=0
+INTACT: YES
+
+[T7] CRASH after-swap -> --recover verifies + completes with NEW studio:
+Manifest verified: 24 files, SHA-256 all match, no unlisted files.
+Staged verification: 24 files verified.
+Existing studio tree backed up before restore: /tmp/NAS-STUDIO-pre-restore-backup-20261113-052443.zip
+[test hook] hard kill at after-swap
+crashed exit=86 (86 expected)
+Stale lock claimed (owner: pid 3369 no longer exists); preserved at /tmp/.nas-restore.lock.recovered-20261113-052448
+Manifest verified: 24 files, SHA-256 all match, no unlisted files.
+RECOVERY DONE — interrupted restore (post-swap) completed: the new studio verified in place, the old tree was removed
+recover exit=0
+marker present (want 0): 0
+new studio vs export manifest: 24/24 identical
+
+[T8] CORRUPT after swap -> same-run AUTOMATIC rollback:
+RESTORE COMPLETE — 24 files, 60.6 MB restored to /tmp/g8/NAS-STUDIO; projects: 1, characters: 1; manifest: verified
+healthy hash: 1cdebaf19c249f97436e71189d6c8e5b05ad545200ff9318d31f79d9eac40465
+Manifest verified: 24 files, SHA-256 all match, no unlisted files.
+Staged verification: 24 files verified.
+Existing studio tree backed up before restore: /tmp/NAS-STUDIO-pre-restore-backup-20261113-052453.zip
+[test hook] corrupted one byte in /tmp/g8/NAS-STUDIO/00-master-control/APPROVALS-AND-SECURITY.md
+RESTORE FAILED — the swapped-in studio failed verification (['NAS-STUDIO/00-master-control/APPROVALS-AND-SECURITY.md (SHA-256 mismatch)']); original studio automatically restored; failed tree kept at /tmp/.nas-failed-20261113-052459
+exit=1
+INTACT (rolled back): YES
+failed tree kept: /tmp/.nas-failed-20261113-052459
+tmpfs           512M   58M  455M  12% /tmp
+
+=== BATCH 2B — journal/lock integrity tests ===
+
+[T9] CORRUPT JOURNAL variants -> restore AND recover refuse, touch nothing:
+RESTORE COMPLETE — 24 files, 60.6 MB restored to /tmp/h/studio/NAS-STUDIO; projects: 1, characters: 1; manifest: verified
+--- variant: truncated
+RESTORE REFUSED — a restore journal exists but cannot be trusted (journal unreadable: JSONDecodeError: Unterminated string starting at: line 1 column 25 (char 24)) — nothing was touched; inspect /tmp/h/.nas-restore-journal.json manually
+restore exit=2
+RECOVERY REFUSED — journal unreadable: JSONDecodeError: Unterminated string starting at: line 1 column 25 (char 24). Nothing was touched. Inspect /tmp/h/.nas-restore-journal.json manually.
+recover exit=2
+journal still present: YES | studio INTACT: YES
+--- variant: badsum
+RESTORE REFUSED — a restore journal exists but cannot be trusted (journal checksum mismatch (corrupt or tampered)) — nothing was touched; inspect /tmp/h/.nas-restore-journal.json manually
+restore exit=2
+RECOVERY REFUSED — journal checksum mismatch (corrupt or tampered). Nothing was touched. Inspect /tmp/h/.nas-restore-journal.json manually.
+recover exit=2
+journal still present: YES | studio INTACT: YES
+--- variant: badstate
+RESTORE REFUSED — a restore journal exists but cannot be trusted (journal state unknown: 'bogus-state') — nothing was touched; inspect /tmp/h/.nas-restore-journal.json manually
+restore exit=2
+RECOVERY REFUSED — journal state unknown: 'bogus-state'. Nothing was touched. Inspect /tmp/h/.nas-restore-journal.json manually.
+recover exit=2
+journal still present: YES | studio INTACT: YES
+--- variant: badpath
+RESTORE REFUSED — a restore journal exists but cannot be trusted (journal path for staging is not a recognised staging/old folder) — nothing was touched; inspect /tmp/h/.nas-restore-journal.json manually
+restore exit=2
+RECOVERY REFUSED — journal path for staging is not a recognised staging/old folder. Nothing was touched. Inspect /tmp/h/.nas-restore-journal.json manually.
+recover exit=2
+journal still present: YES | studio INTACT: YES
+
+[T10] CORRUPT LOCK -> refuse; --force-stale-lock is the only way, and it is reported:
+RESTORE COMPLETE — 24 files, 60.6 MB restored to /tmp/i/studio/NAS-STUDIO; projects: 1, characters: 1; manifest: verified
+RESTORE REFUSED — another restore holds the lock at /tmp/i/.nas-restore.lock: (lock contents unreadable). If that process is dead, run: restore_studio.py --recover <target-folder>
+restore exit=3
+RECOVERY REFUSED — the lock at /tmp/i/.nas-restore.lock is unreadable, so its owner cannot be assessed. Nothing was touched. If you have confirmed manually that no restore is running, re-run with --force-stale-lock.
+recover exit=2
+Operator override: proceeding despite an unreadable lock (--force-stale-lock).
+Operator override: owner unprovable (assessed under operator override); proceeding under --force-stale-lock.
+Stale lock claimed (owner: assessed under operator override); preserved at /tmp/i/.nas-restore.lock.recovered-20261113-052541
+RECOVERY DONE — no interrupted restore was recorded; only the stale lock was cleared.
+recover+force exit=0
+studio INTACT through all of it: YES | garbage lock preserved as: /tmp/i/.nas-restore.lock.recovered-20261113-052541
+
+[T12] PID + START-TIME with a REAL live process (sleep):
+sleep pid=3608 real start_time=145800
+--- lock A: live pid but WRONG start-time (= pid-reuse case; original owner is gone):
+Stale lock claimed (owner: pid 3608 exists but its start-time differs from the lock's — the pid was reused; the lock's owner is gone); preserved at /tmp/k/.nas-restore.lock.recovered-20261113-052542
+RECOVERY DONE — no interrupted restore was recorded; only the stale lock was cleared.
+exit=0
+--- lock B: live pid with CORRECT start-time (= genuinely alive owner):
+RECOVERY REFUSED — the lock's owner is alive (pid 3608 is alive and its start-time matches the lock). An active process's lock is never modified.
+exit=3
+lock B untouched: YES
+
+[T14] TWO recoveries at once on one stale state -> exactly one proceeds:
+recovery1 exit=0: RECOVERY DONE — interrupted restore (staging phase) cleaned up; the existing studio was never touched
+recovery2 exit=0: Nothing to recover: no journal and no lock.
+DONE count: 1 (want 1) | REFUSED count: 0 (want 1)
+
+[T10-rerun] corrupt lock + force (cosmetic fix check — override line must appear ONCE):
+Operator override: owner unprovable (lock unreadable — assessed under operator override); proceeding under --force-stale-lock.
+Stale lock claimed (owner: lock unreadable — assessed under operator override); preserved at /tmp/i/.nas-restore.lock.recovered-20261113-052626
+RECOVERY DONE — no interrupted restore was recorded; only the stale lock was cleared.
+exit=0
+
+[T11] LIVE LOCK — real restore process paused mid-run; second restore + recovery must refuse; lock untouched:
+bg restore running: YES | lock present: YES
+RESTORE REFUSED — another restore holds the lock at /tmp/.nas-restore.lock: {'pid': 3724, 'start_time': 150228, 'host': 'htch-runtime', 'run_id': '3724-1794529586-2a29062f', 'created': '2026-11-13T05:26:26'}. If that process is dead, run: restore_studio.py --recover <target-folder>
+second restore exit=3 (want 3)
+RECOVERY REFUSED — the lock's owner is alive (pid 3724 is alive and its start-time matches the lock). An active process's lock is never modified.
+recover exit=3 (want 3)
+lock untouched by both refusals: YES
+bg restore exit=0
+RESTORE COMPLETE — 24 files, 60.6 MB restored to /tmp/j/NAS-STUDIO; projects: 1, characters: 1; manifest: verified
+lock self-removed after normal finish: YES | studio files: 24
+
+[T13] ZIP SECURITY SUITE re-run on the new code:
+--- symlink:
+RESTORE ABORTED — unsafe entry: symlink entry refused: NAS-STUDIO/evil-link
+exit=1
+--- path traversal:
+RESTORE ABORTED — unsafe entry: path traversal entry: ../evil.txt
+exit=1 | evil.txt in /tmp: NONE
+--- duplicate WITH manifest:
+/usr/lib/python3.12/zipfile/__init__.py:1620: UserWarning: Duplicate name: 'NAS-STUDIO/data.json'
+  return self._open_to_write(zinfo, force_zip64=force_zip64)
+RESTORE ABORTED — archive limit: duplicate path entries refused: ['NAS-STUDIO/data.json']
+exit=1
+--- duplicate WITHOUT manifest:
+/usr/lib/python3.12/zipfile/__init__.py:1620: UserWarning: Duplicate name: 'NAS-STUDIO/data.json'
+  return self._open_to_write(zinfo, force_zip64=force_zip64)
+RESTORE ABORTED — archive limit: duplicate path entries refused: ['NAS-STUDIO/data.json']
+exit=1
+--- ZIP bomb (300MB zeros):
+RESTORE ABORTED — archive limit: suspicious compression ratio: NAS-STUDIO/bomb.bin (1029:1) — possible ZIP bomb
+exit=1 | studio created: NO — 0 bytes written
+--- disk-space guard (logic test, simulated 1MB free):
+guard verdict: not enough free space at /tmp: need ~66692231 bytes, only 1048576 free — restore refused before writing anything
+(plus REAL firing evidence: the first batch-2A run was refused by this guard on a genuinely full /tmp — see earlier in this log)
+--- nested archive: (a) unlisted inner.zip now REJECTED by Finding-1 fix; (b) listed archives stay inert:
+RESTORE ABORTED — manifest/ZIP mismatch: unlisted files in ZIP: ['NAS-STUDIO/09-backups/inner.zip']; listed files missing from ZIP: []
+exit=1 (want 1, unlisted)
+RESTORE COMPLETE — 24 files, 60.6 MB restored to /tmp/s7/NAS-STUDIO; projects: 1, characters: 1; manifest: verified
+listed backup zips restored as files: 0
+
+[CONDITION 9] real NAS-STUDIO tree after ALL tests (baseline was 8c51d659...):
+8c51d6594cf79d343056b795fd4901aaa9b550b2a443466754f6468701ea35cf  -
+tmpfs           512M   58M  455M  12% /tmp
+
+=== APP REGRESSION (builder Node harness, run twice, identical results) ===
+PBKDF2/PIN suite: 49/49 PASS — published PBKDF2 test vectors (iter 1, 4096) +
+Node pbkdf2Sync cross-check; set PIN via real UI handler (record PBKDF2-SHA256,
+iter 210000, salt 16B, hash 32B, PIN never stored); locked gate blocked + logged,
+no state change; wrong PIN blocked + counted + audit-logged; correct PIN unlock;
+persistence across simulated reload; PIN reset; 5-failure 60s lockout (correct
+PIN refused during lockout, accepted after expiry); legacy SHA-256 migration on
+successful unlock only (failed attempt leaves legacy record untouched).
+Adapter suite: 29/29 PASS — 3 projects / 4 characters / 5 approvals via
+studioToAppData (APR-S1..S5, statuses mapped), export re-validates schema v2.
+Embedded RESTORE_DOC in built page: 32,407 bytes, sha256
+3e78237167fc191036502dbe083a4356246526aa105eba3c245a8a99540b1bb0 = byte-identical
+to tools/restore_studio.py (verified by Python splice + Node vm re-hash).
+SCRIPT_GEN / SCRIPT_EXP decoded hashes unchanged (4c5d62d1… / aa69ae84…).
+Full inline script parse: PASS.
