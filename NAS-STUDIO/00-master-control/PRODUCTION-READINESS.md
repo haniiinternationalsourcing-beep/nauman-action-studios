@@ -12,6 +12,17 @@ PENDING = not yet tested in the required environment. PLANNED = not built.
 - Backup: export_studio.py ZIP + SHA-256 manifest.
 - Restore: real extraction; manifest verified before + re-hashed after;
   21/21 files byte-identical to source (independent comparison).
+  Fix phase 2 (post-review): manifest verification is TWO-directional
+  (unlisted extra files and missing listed files both reject);
+  extraction is staged on the same filesystem and the swap is guarded
+  by a checksummed journal with fsync — kills during staging, mid-swap
+  and after swap all recover automatically (original restored or new
+  studio verified and completed); post-swap corruption rolls back in
+  the same run; corrupt journal/lock stops everything without touching
+  a folder; a single-restore lock with PID + start-time stale-lock
+  protocol protects live processes. Full evidence:
+  TEST-REPORT-2026-11-13.md (Fix phase 2) and
+  fix2-verification-20261113.log.
 - Restore safety: path traversal refused; symlink refused; duplicate
   paths refused (with/without manifest); ZIP bomb refused pre-extraction
   (ratio/size/entry limits); low-disk-space refused pre-write; nested
@@ -42,6 +53,12 @@ PENDING = not yet tested in the required environment. PLANNED = not built.
   the disk tool as canonical + packaging sync; re-verified byte-equal.
 - Restore was verify-only in the audited build. Rebuilt as a real
   restore; proof above.
+- Manifest check was one-directional (independent review of commit
+  d78f931): an extra unlisted file restored silently. Fixed with
+  two-directional verification; reject proven by test.
+- Restore had no rollback (same review): a mid-extraction crash left a
+  partial studio. Fixed with staged extraction + journal + lock +
+  recovery mode; kill/corruption tests prove automatic recovery.
 
 ## PENDING (not done — do not treat as passed)
 - **Live browser click-testing** in real Android Chrome (owner's Infinix)

@@ -116,3 +116,80 @@ Files changed: the app artifact (red/white/yellow design unchanged).
 - **Embedded sync:** RESTORE_DOC re-synced to the final canonical
   restore_studio.py (free-space guard + streaming extraction included);
   all three embedded scripts byte-identical to tools/ at the final commit.
+
+## Fix phase 2 — independent-review findings (2026-11-13, owner-approved)
+Baseline recorded before any change (owner condition): original commit
+d78f931b86a5c6958bb8da3c1542f6695b2453a4; original restore_studio.py
+SHA-256 e61cca15422657a054010410903cc97444222466e8d99926e1b58c8b3df68068;
+real NAS-STUDIO tree aggregate SHA-256
+8c51d6594cf79d343056b795fd4901aaa9b550b2a443466754f6468701ea35cf (30
+files). Full raw log: fix2-verification-20261113.log (workspace root of
+the studio package).
+- **Finding 1 (extra unlisted file restored silently) — FIXED + TESTED:**
+  manifest verification is now two-directional. T1: an unlisted file now
+  REJECTS in verify-only and in full restore (nothing restored). T2b: a
+  manifest-listed non-required file removed from the ZIP is rejected by
+  the manifest check itself (the first T2 attempt was caught earlier by
+  the required-files check; T2b isolates the manifest path).
+- **Finding 2 (no automatic rollback; crash left a partial studio) —
+  FIXED + TESTED:** staged extraction on the same filesystem, journal
+  (atomic write + checksum + fsync of file and parent directory),
+  rename swap, post-swap hash re-verification, old tree deleted only
+  after it passes, single-restore lock with PID + /proc start-time
+  two-evidence stale-lock protocol and a --recover mode.
+  T3 legit restore: staged + post-swap verification PASS, 24/24 files
+  byte-identical to the real tree, no leftovers. T4/T4b collisions
+  (unlisted and self-consistent manifested): rejected/aborted in
+  staging, existing studio byte-identical. T5 kill during staging:
+  journal+lock+staging remained; --recover claimed the stale lock
+  (owner PID dead), cleaned up, studio intact. T6 kill mid-swap (old
+  aside, new not in): --recover automatically restored the original,
+  byte-identical. T7 kill after swap: --recover verified the new studio
+  (24/24) and completed the restore. T8 byte corrupted after swap:
+  post-swap verification failed and the SAME run rolled back
+  automatically; studio byte-identical, failed tree preserved.
+  T9 corrupt journals (truncated / bad checksum / unknown state /
+  path outside the target parent): restore and --recover both REFUSE
+  (exit 2), journal preserved, studio intact. T10 corrupt lock: restore
+  refuses (3), --recover refuses (2); only the operator's deliberate
+  --force-stale-lock proceeds, is reported, and preserves the old lock
+  as a .recovered-* record; studio intact. T11 live lock with a REAL
+  running restore process: second restore refused (3), --recover
+  refused (3, owner alive with matching start-time), lock file hash
+  unchanged by both refusals; the first restore then completed normally
+  and removed its own lock. T12 PID/start-time against a real `sleep`
+  process: live PID with wrong start-time correctly judged a reused
+  PID (owner gone); live PID with correct start-time refused as alive,
+  lock untouched. T13 ZIP security suite re-run: symlink, traversal,
+  duplicates (with and without manifest), 300 MB bomb (refused
+  pre-extraction, 0 bytes), disk-space guard (logic test; the guard
+  also fired for real once during this phase on a genuinely full /tmp).
+  Nested archives: an unlisted inner archive now REJECTS (Finding 1);
+  real exports contain no nested archives, so inertness of listed
+  archives rests on construction (restore only ever reads the outer
+  ZIP's entries) plus the T3 byte-compare — recorded honestly as such.
+  T14 two simultaneous recoveries: exactly one performed the recovery;
+  the second found nothing left to do and exited as a harmless no-op
+  (NOT a refusal — recorded as observed).
+  One full batch (first crash-suite attempt) was INVALID and is kept in
+  the log labelled as such: /tmp (512 MB tmpfs) filled up, the
+  free-space guard refused the setups, and the crash points were never
+  reached; the batch was re-run after cleanup and passed as above.
+- **Condition 9 proof:** after ALL tests, the real NAS-STUDIO tree
+  aggregate SHA-256 was re-measured: identical to the baseline
+  (8c51d659…). The production studio and its backups were never used
+  as a test target; every test ran in /tmp.
+- Final restore_studio.py SHA-256:
+  3e78237167fc191036502dbe083a4356246526aa105eba3c245a8a99540b1bb0.
+  (One cosmetic fix during the phase removed a duplicated override
+  warning line in --recover; T10 was re-run after it.)
+- **App regression after the embedded sync (builder Node harness, run
+  twice, identical):** PBKDF2/PIN suite 49/49 PASS (test vectors +
+  Node pbkdf2Sync cross-check; set/lock/wrong/correct; persistence
+  across simulated reload; PIN reset; 5-failure lockout incl. correct
+  PIN refused during lockout and accepted after expiry; legacy
+  migration on successful unlock only). Adapter suite 29/29 PASS
+  (3 projects / 4 characters / 5 approvals, APR-S1..S5, export
+  re-validates as schema v2). Embedded RESTORE_DOC decoded from the
+  built page = 32,407 bytes, SHA-256 3e782371… — byte-identical to
+  tools/restore_studio.py; SCRIPT_GEN/SCRIPT_EXP unchanged.
