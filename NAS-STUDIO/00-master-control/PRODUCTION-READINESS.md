@@ -23,6 +23,19 @@ PENDING = not yet tested in the required environment. PLANNED = not built.
   protocol protects live processes. Full evidence:
   TEST-REPORT-2026-11-13.md (Fix phase 2) and
   fix2-verification-20261113.log.
+  Fix phase 3 (independent Grok audit of the fix-phase-2 commit,
+  confirmed by ChatGPT): Windows path forms (drive-letter, UNC,
+  device-namespace, colon/reserved/trailing-space-dot components) are
+  rejected and every extraction destination is containment-verified
+  inside the staging folder immediately before an exclusive,
+  no-follow create; directory fsyncs fail CLOSED — only explicitly
+  unsupported platforms/filesystems degrade (with a printed notice),
+  genuine I/O errors at journal/rename points abort with exit 4 and
+  leave a checksum-valid, recoverable journal; a journal is acted on
+  only for its recorded target (canonical, platform-aware comparison)
+  with staging/old-tree paths validated against the recorded target's
+  parent before any mutation. Full evidence: TEST-REPORT-2026-11-13.md
+  (Fix phase 3) and fix3-verification-20261113.log.
 - Restore safety: path traversal refused; symlink refused; duplicate
   paths refused (with/without manifest); ZIP bomb refused pre-extraction
   (ratio/size/entry limits); low-disk-space refused pre-write; nested
@@ -59,6 +72,20 @@ PENDING = not yet tested in the required environment. PLANNED = not built.
 - Restore had no rollback (same review): a mid-extraction crash left a
   partial studio. Fixed with staged extraction + journal + lock +
   recovery mode; kill/corruption tests prove automatic recovery.
+- Windows ZIP paths were incompletely validated (Grok audit of the
+  fix-phase-2 commit): drive-letter forms passed the old check. Fixed
+  with a strict validator + resolve-based containment + exclusive
+  no-follow file creation; 16-case battery + unit tests prove refusal.
+- fsync_dir silently swallowed every OSError (same audit): genuine
+  I/O errors could void journal durability without a signal. Fixed
+  with explicit classification — unsupported-only degradation with a
+  printed notice, fail-closed (exit 4) at mandatory points; fault
+  injection (EIO/ENOSPC/EINVAL) proves each behaviour.
+- Recovery never compared the journal's recorded target with the
+  operator's target (same audit): a misplaced journal could act on
+  the wrong studio. Fixed with canonical target binding validated
+  before any mutation; cross-target and moved-journal tests prove
+  refusal, own-target recovery unaffected.
 
 ## PENDING (not done — do not treat as passed)
 - **Live browser click-testing** in real Android Chrome (owner's Infinix)

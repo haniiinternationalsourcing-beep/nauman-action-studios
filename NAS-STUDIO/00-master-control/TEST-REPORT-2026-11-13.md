@@ -193,3 +193,71 @@ the studio package).
   re-validates as schema v2). Embedded RESTORE_DOC decoded from the
   built page = 32,407 bytes, SHA-256 3e782371… — byte-identical to
   tools/restore_studio.py; SCRIPT_GEN/SCRIPT_EXP unchanged.
+
+## Fix phase 3 — Grok audit findings (2026-11-13, after commit 3f90625)
+
+Independent Grok audit of the fix-phase-2 commit, confirmed by
+ChatGPT source inspection, raised three findings. Owner approved the
+implementation plan with three additional conditions (symlink/race
+hardening, explicit unsupported-only fsync degradation, canonical
+journal-target comparison). Baseline before changes: commit
+3f9062569d89d80bfac109dc23827ce6d3f51512; restore_studio.py SHA-256
+3e782371…; real NAS-STUDIO tree aggregate 7f6aafe1… (31 files).
+Evidence: fix3-verification-20261113.log (kept in the repo).
+
+- Finding 1 — Windows ZIP path validation: validator now rejects
+  drive-letter (absolute/relative), UNC, device-namespace and absolute
+  paths, colon-bearing components, empty/dot components, trailing
+  space/dot components or stems, blank dot-segments, double dots and
+  Windows reserved device names. Extraction resolves each destination
+  and verifies containment inside the resolved staging folder
+  immediately before writing, builds parent folders without following
+  symlinks, and creates files exclusively (O_EXCL + O_NOFOLLOW where
+  available). verify_tree applies the same containment to reads.
+  Tests: N1 (16 evil entries, all rejected at inspect, target
+  untouched) PASS; N2 (containment/symlink-chain/exclusive-create
+  unit checks) PASS.
+- Finding 2 — fsync_dir silently suppressed OSError: now classified.
+  Only Windows or EINVAL/ENOTSUP/EOPNOTSUPP count as unsupported
+  (one printed notice; durability rests on file fsyncs + journal
+  checksums). Genuine errors (EIO, ENOSPC, ...) at mandatory points
+  (journal writes, swap renames) raise DurabilityError — exit 4,
+  operation stops before further mutation, journal stays
+  checksum-valid and recoverable; non-mandatory points warn. The
+  recovery logic also gained two evidence-based branches for a journal
+  whose last write raced a crash (swap-done/journal-not-updated, and
+  journal-written/swap-never-started), decided by verification, never
+  by guess. Tests (fault injection patching os.fsync for directory
+  fds): N3a EIO → exit 4, studio intact, --recover reconciles PASS;
+  N3b EINVAL → notice printed, restore completes PASS; N3c ENOSPC →
+  exit 4 PASS.
+- Finding 3 — journal target never compared: read_journal now binds
+  the journal to the operator's target with a canonical comparison
+  (normcase/realpath/abspath — Windows case folding included) and
+  validates staging/old_tree against the RECORDED target's parent,
+  before any filesystem mutation, on both the restore and --recover
+  paths; new journals record the canonical target. Tests: N4
+  cross-target recovery refused (exit 2), journal and both studios
+  untouched, own-target recovery completes PASS; N5 journal copied to
+  another folder refused PASS; N6 canonical spelling variants PASS.
+- Complete previous regression re-run (battery run_fix3_tests.py):
+  N1–N6 PASS; T1, T4/T4b, T5, T6, T7, T8, T10, T11, T12, T13, T14
+  PASS. Three first-run FAILs were HARNESS defects, analysed in the
+  log and re-run corrected: T2b (harness had removed the dropped file
+  from the manifest too, making the variant self-consistent) → PASS;
+  T3 (harness compared against the live 31-file tree instead of the
+  export's 24 files) → PASS; T9 (crashed setup's leftover lock
+  correctly refused the restore before the journal check) → PASS.
+  Two earlier battery attempts aborted on harness issues (a script
+  bug and a full 512 MB /tmp — the free-space guard refused the
+  setup, as designed) and are recorded in the log, not hidden.
+- App regression after the embedded sync: PBKDF2/PIN + adapter
+  harness results and the embedded byte-compare are recorded at the
+  end of fix3-verification-20261113.log.
+- Condition proof: after ALL tests, the real NAS-STUDIO tree
+  aggregate SHA-256 re-measured = 7f6aafe1…, identical to the
+  fix-phase-3 baseline. All tests ran in sandboxes; the production
+  studio and its backups were never a test target.
+- Final restore_studio.py SHA-256:
+  e5847a69a4429ddd187a01abed8f875fcd626d4a34709a34d1ea87847f747d14
+  (43,719 bytes).
