@@ -16,7 +16,28 @@ Usage:
 
 Safety:
   - Entries with absolute paths, '..' components or symlink types are
-    REJECTED (zip-slip / link attacks) and abort the restore.
+    REJECTED (zip-slip / link attacks) and abort the restore. Windows
+    path forms are rejected too: drive-letter (absolute or relative),
+    UNC, device-namespace and any colon-bearing, trailing-space/dot or
+    reserved-name component. Extraction resolves every destination and
+    verifies containment inside the staging folder immediately before
+    writing, creates files exclusively (O_EXCL, O_NOFOLLOW where
+    available), and refuses to walk through symlinked folders.
+    (Audit fix phase 3, 2026-11-13.)
+  - Directory fsyncs FAIL CLOSED: only explicitly unsupported cases
+    (Windows, or EINVAL/ENOTSUP from the filesystem) degrade — with a
+    printed notice — to file fsyncs + journal checksums. Genuine I/O
+    errors (EIO, ENOSPC, ...) at the mandatory durability points
+    (journal writes, swap renames) abort the operation before any
+    further change; the journal left on disk stays checksum-valid and
+    recoverable. (Audit fix phase 3, 2026-11-13.)
+  - A journal is acted on ONLY for the target it records: the recorded
+    target is compared, canonically (platform-aware: Windows case
+    folding, path normalisation, symlink resolution), with the target
+    the operator supplied, and the staging/old-tree paths are validated
+    against the recorded target's parent — all before any filesystem
+    mutation. A journal for another target, or one moved to another
+    folder, is refused untouched. (Audit fix phase 3, 2026-11-13.)
   - If the ZIP carries MANIFEST.json (exports from 2026-11-13 onward),
     verification is TWO-DIRECTIONAL: every manifest entry must be in the
     ZIP with a matching SHA-256, AND every file in the ZIP (except
@@ -61,7 +82,7 @@ Safety:
     NAS_RESTORE_PAUSE=<seconds> sleeps while holding the lock.
 """
 import sys, os, io, json, zipfile, hashlib, stat, datetime, shutil, tempfile
-import socket, time
+import socket, time, re, errno
 
 REQUIRED = ["NAS-STUDIO/README.md", "NAS-STUDIO/OPERATOR-MANUAL.md",
             "NAS-STUDIO/data.json",
@@ -73,18 +94,50 @@ LOCK_NAME = ".nas-restore.lock"
 JOURNAL_STATES = ("staging", "old-aside", "swapped")
 
 # ---------------------------------------------------------------- durability
-def fsync_dir(path):
-    """Best-effort directory fsync (POSIX). Unsupported platforms (e.g.
-    Windows) degrade to file-level fsyncs only; the journal and lock
-    logic does not depend on this succeeding."""
+class DurabilityError(Exception):
+    """A mandatory directory fsync failed with a genuine I/O error.
+    The operation must stop before any further mutation; the journal
+    on disk (if any) stays checksum-valid and recoverable."""
+
+_DIR_FSYNC_UNSUPPORTED_ERRNOS = {
+    errno.EINVAL,
+    getattr(errno, "ENOTSUP", errno.EINVAL),
+    getattr(errno, "EOPNOTSUPP", errno.EINVAL),
+}
+_dir_fsync_notice_shown = False
+
+def fsync_dir(path, mandatory=True):
+    """Directory fsync with explicit failure handling (audit fix 3).
+
+    Returns True when the fsync was performed. Only EXPLICITLY
+    unsupported cases — Windows (os.name == 'nt', where a directory
+    cannot be opened for fsync this way), or EINVAL / ENOTSUP /
+    EOPNOTSUPP from the filesystem — degrade, with a one-time printed
+    notice, to file-level fsyncs + journal checksums. Every other
+    failure (EIO, ENOSPC, EROFS, ...) is a genuine I/O error: at a
+    mandatory durability point (journal writes, swap renames) it raises
+    DurabilityError and the operation fails closed; at a non-mandatory
+    point (lock bookkeeping, cleanup) it prints a warning."""
+    global _dir_fsync_notice_shown
     try:
         fd = os.open(path, os.O_RDONLY)
         try:
             os.fsync(fd)
         finally:
             os.close(fd)
-    except OSError:
-        pass
+        return True
+    except OSError as e:
+        if os.name == "nt" or e.errno in _DIR_FSYNC_UNSUPPORTED_ERRNOS:
+            if not _dir_fsync_notice_shown:
+                _dir_fsync_notice_shown = True
+                print("note: directory fsync is not supported on this "
+                      "platform/filesystem — durability relies on file-level "
+                      "fsyncs and journal checksums.", file=sys.stderr)
+            return False
+        if mandatory:
+            raise DurabilityError(f"directory fsync failed for {path}: {e}")
+        print(f"warning: directory fsync failed for {path}: {e}", file=sys.stderr)
+        return False
 
 def fsync_file(f):
     f.flush()
@@ -166,7 +219,7 @@ class RestoreLock:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(json.dumps(self.payload(), indent=2))
             fsync_file(f)
-        fsync_dir(self.parent)
+        fsync_dir(self.parent, mandatory=False)
 
     def release(self):
         """Delete ONLY our own lock: re-read and match the run id first."""
@@ -174,11 +227,18 @@ class RestoreLock:
             current = json.loads(open(self.path, encoding="utf-8").read())
             if current.get("run_id") == self.run_id:
                 os.unlink(self.path)
-                fsync_dir(self.parent)
+                fsync_dir(self.parent, mandatory=False)
         except Exception:
             pass
 
 # ---------------------------------------------------------------- journal
+def canonical(p):
+    """Platform-aware canonical path for comparisons: absolute, fully
+    normalised, symlinks resolved, and case-folded where the platform
+    folds case (os.path.normcase lowercases on Windows, identity on
+    POSIX)."""
+    return os.path.normcase(os.path.realpath(os.path.abspath(p)))
+
 def journal_file(parent):
     return os.path.join(parent, JOURNAL_NAME)
 
@@ -193,9 +253,12 @@ def write_journal(parent, payload):
     os.rename(tmp, journal_file(parent))
     fsync_dir(parent)
 
-def read_journal(parent):
+def read_journal(parent, expected_target=None):
     """(payload, None) or (None, error). A journal that cannot be fully
-    validated is an error, never a guess."""
+    validated is an error, never a guess. When expected_target is given,
+    the journal is additionally bound to that target (audit fix 3): the
+    recorded target must canonically equal the supplied one, and the
+    staging / old-tree paths must sit in the RECORDED target's parent."""
     p = journal_file(parent)
     if not os.path.exists(p):
         return None, None
@@ -211,12 +274,24 @@ def read_journal(parent):
         for key in ("run_id", "target", "staging", "old_tree", "zip_path"):
             if key not in d:
                 return None, f"journal missing field: {key}"
+        recorded = d.get("target")
+        if not isinstance(recorded, str) or not recorded:
+            return None, "journal target field is not a usable path"
+        rec_parent = os.path.dirname(canonical(recorded))
+        if rec_parent != canonical(parent):
+            return None, ("journal target's parent does not match the folder "
+                          "the journal was found in (journal moved or copied?)")
+        if expected_target is not None and canonical(recorded) != canonical(expected_target):
+            return None, (f"journal target mismatch: the journal records "
+                          f"{recorded} but the supplied target is "
+                          f"{expected_target} — a journal is never acted on "
+                          f"for another target")
         for key in ("staging", "old_tree"):
             value = d.get(key)
             if value is not None:
-                if os.path.dirname(value) != parent or \
+                if os.path.dirname(canonical(value)) != rec_parent or \
                         not os.path.basename(value).startswith((".nas-staging-", ".nas-old-")):
-                    return None, f"journal path for {key} is not a recognised staging/old folder"
+                    return None, f"journal path for {key} is not a recognised staging/old folder in the recorded target's parent"
         return d, None
     except Exception as e:
         return None, f"journal unreadable: {type(e).__name__}: {e}"
@@ -226,7 +301,7 @@ def delete_journal(parent):
         os.unlink(journal_file(parent))
     except FileNotFoundError:
         pass
-    fsync_dir(parent)
+    fsync_dir(parent, mandatory=False)
 
 # ---------------------------------------------------------------- archive checks
 def backup_existing_tree(target):
@@ -257,17 +332,98 @@ def backup_existing_tree(target):
 def sha256_bytes(b):
     return hashlib.sha256(b).hexdigest()
 
+_DRIVE_PREFIX = re.compile(r"^[A-Za-z]:")
+_RESERVED_STEMS = ({"CON", "PRN", "AUX", "NUL"}
+                   | {f"COM{i}" for i in range(1, 10)}
+                   | {f"LPT{i}" for i in range(1, 10)})
+
 def check_entry_safety(info):
+    """Reject any entry whose name could escape or confuse the target
+    folder on ANY supported platform (audit fix 3): absolute paths, UNC
+    and device-namespace paths, Windows drive-letter paths (absolute or
+    drive-relative), '..' or empty components, colon-bearing components,
+    components with trailing spaces/dots (which Windows silently trims),
+    Windows reserved device names, and symlink entries."""
     name = info.filename
-    if name.startswith("/") or name.startswith("\\"):
-        return f"absolute path entry: {name}"
-    parts = name.replace("\\", "/").split("/")
-    if ".." in parts:
-        return f"path traversal entry: {name}"
+    if not name or "\x00" in name:
+        return f"empty or NUL-containing entry name: {name!r}"
+    if name[0] in "/\\" or name.startswith("//"):
+        return f"absolute/UNC/device path entry: {name}"
+    if _DRIVE_PREFIX.match(name):
+        return f"Windows drive-letter path entry: {name}"
+    parts = re.split(r"[/\\]", name)
+    if name.endswith("/"):
+        parts = parts[:-1]  # directory entry: drop the trailing empty part
+    for part in parts:
+        if part in ("", ".", ".."):
+            return f"unsafe path component {part!r} in entry: {name}"
+        if ":" in part:
+            return f"colon in path component of entry: {name}"
+        if ".." in part:
+            return f"double-dot in path component of entry: {name}"
+        if part != part.strip() or part.endswith("."):
+            return f"Windows-unsafe path component (edge space/dot) in entry: {name}"
+        stem = part.split(".")[0]
+        if stem != stem.strip() or stem.endswith("."):
+            return f"Windows-unsafe path component (stem edge space/dot) in entry: {name}"
+        for seg in part.split(".")[1:]:
+            if seg and (seg.strip() == "" or seg.strip(".") == ""):
+                return f"Windows-unsafe path component (blank segment) in entry: {name}"
+        if part.split(".")[0].upper() in _RESERVED_STEMS:
+            return f"Windows reserved device name in entry: {name}"
     mode = (info.external_attr >> 16) & 0xFFFF
     if stat.S_ISLNK(mode):
         return f"symlink entry refused: {name}"
     return None
+
+def contained_dest(root, arc):
+    """Resolve arc under root and refuse anything that lands outside
+    the resolved root (audit fix 3). Symlinks in the already-existing
+    prefix are resolved by realpath, so a planted link is caught here;
+    the result is checked again implicitly by extract_entry's chain
+    walk and exclusive create."""
+    root_real = os.path.realpath(root)
+    dest = os.path.realpath(os.path.join(root_real, *arc.split("/")))
+    if dest != root_real and not dest.startswith(root_real + os.sep):
+        raise ValueError(f"entry destination escapes its folder: {arc}")
+    return dest
+
+def _ensure_parent_chain(root, dest):
+    """Create dest's parent folders one level at a time under root,
+    refusing to walk through a symlink or a non-folder (audit fix 3)."""
+    root_real = os.path.realpath(root)
+    rel = os.path.relpath(os.path.dirname(dest), root_real)
+    cur = root_real
+    if rel == ".":
+        return
+    for part in rel.split(os.sep):
+        cur = os.path.join(cur, part)
+        if os.path.islink(cur):
+            raise ValueError(f"refusing to extract through a symlinked folder: {cur}")
+        if os.path.exists(cur):
+            if not os.path.isdir(cur):
+                raise ValueError(f"extraction path blocked by a non-folder: {cur}")
+        else:
+            os.mkdir(cur)
+
+def extract_entry(z, info, staging):
+    """Write one ZIP entry into staging safely (audit fix 3):
+    containment is resolved and verified immediately before writing,
+    parent folders are created without following symlinks, and the
+    file itself is created exclusively (O_EXCL, plus O_NOFOLLOW where
+    the platform offers it), so an existing file or link is never
+    overwritten."""
+    dest = contained_dest(staging, info.filename)
+    _ensure_parent_chain(staging, dest)
+    if os.path.islink(dest) or os.path.exists(dest):
+        raise ValueError(f"destination already exists or is a link: {info.filename}")
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(dest, flags, 0o644)
+    # Stream in 1 MB chunks: a large entry never sits fully in memory.
+    # Nested archives are copied as inert data files.
+    with z.open(info) as src, os.fdopen(fd, "wb") as out_f:
+        shutil.copyfileobj(src, out_f, 1024 * 1024)
+        fsync_file(out_f)
 
 # Decompression-bomb + abuse limits, checked from the ZIP directory BEFORE
 # anything is extracted (added 2026-11-13 after a bomb test filled the disk:
@@ -366,8 +522,13 @@ def verify_tree(root, manifest, infos):
     Returns (ok, detail)."""
     if manifest:
         bad = []
+        root_real = os.path.realpath(root)
         for arc, want in manifest.items():
             p = os.path.join(root, arc)
+            if os.path.realpath(p) != root_real and \
+                    not os.path.realpath(p).startswith(root_real + os.sep):
+                bad.append(f"{arc} (escapes the verified folder)")
+                continue
             if not os.path.exists(p):
                 bad.append(f"{arc} (missing)")
                 continue
@@ -387,11 +548,28 @@ def verify_tree(root, manifest, infos):
     return (not bad), bad
 
 # ---------------------------------------------------------------- crash recovery
+def _verify_recorded(target, d):
+    """Verify the tree at <target>/NAS-STUDIO against the journal's
+    recorded export ZIP. Returns (ok, detail)."""
+    zip_path = d.get("zip_path")
+    if not zip_path or not os.path.exists(zip_path):
+        return False, "recorded export ZIP is unavailable for verification"
+    try:
+        z = zipfile.ZipFile(zip_path)
+        infos, _d, manifest, ierr = inspect_zip(z)
+        if ierr is not None:
+            return False, ierr
+        return verify_tree(target, manifest, infos)
+    except Exception as e:
+        return False, f"verification could not run: {e}"
+
 def process_journal(parent, target):
-    """Act on a leftover journal. Caller must hold the lock.
+    """Act on a leftover journal. Caller must hold the lock. The journal
+    is validated against the supplied target before ANY filesystem
+    mutation (read_journal refuses cross-target or moved journals).
     Returns (report, error): exactly one of them is set, or both None
     when there is no journal."""
-    d, err = read_journal(parent)
+    d, err = read_journal(parent, expected_target=target)
     if err:
         return None, (f"a restore journal exists but cannot be trusted ({err}) — "
                       f"nothing was touched; inspect {journal_file(parent)} manually")
@@ -418,19 +596,43 @@ def process_journal(parent, target):
             delete_journal(parent)
             return ("interrupted swap found (old studio set aside, new one not "
                     "in place) — original studio automatically restored"), None
+        if old_tree and os.path.exists(old_tree) and os.path.exists(final):
+            # The process died after the swap rename but before the
+            # 'swapped' journal write landed. Decide by EVIDENCE: verify
+            # the in-place tree against the recorded export.
+            ok, detail = _verify_recorded(target, d)
+            if ok:
+                shutil.rmtree(old_tree, ignore_errors=True)
+                if os.path.exists(staging):
+                    shutil.rmtree(staging, ignore_errors=True)
+                delete_journal(parent)
+                return ("interrupted restore (swap done, journal update lost) "
+                        "completed: the new studio verified in place, the old "
+                        "tree was removed"), None
+            grave = os.path.join(parent, f".nas-failed-{stamp}")
+            os.rename(final, grave)
+            os.rename(old_tree, final)
+            fsync_dir(parent)
+            fsync_dir(target)
+            if os.path.exists(staging):
+                shutil.rmtree(staging, ignore_errors=True)
+            delete_journal(parent)
+            return (f"interrupted restore's in-place studio FAILED verification "
+                    f"({detail}) — rolled back to the original studio; "
+                    f"failed tree kept at {grave}"), None
+        if (not old_tree or not os.path.exists(old_tree)) and os.path.exists(final) \
+                and staging and os.path.exists(staging):
+            # The journal write landed but the rename it announces never
+            # happened (e.g. a durability failure aborted the operation at
+            # the journal write): final still holds the untouched studio.
+            shutil.rmtree(staging, ignore_errors=True)
+            delete_journal(parent)
+            return ("interrupted restore (journal written, swap never started) "
+                    "cleaned up; the existing studio was never touched"), None
         return None, ("journal says the old studio was set aside, but the folders "
                       "do not match that state — nothing was touched")
     if state == "swapped":
-        zip_path = d["zip_path"]
-        ok, detail = False, "recorded export ZIP is unavailable for verification"
-        if zip_path and os.path.exists(zip_path):
-            try:
-                z = zipfile.ZipFile(zip_path)
-                infos, _d, manifest, ierr = inspect_zip(z)
-                if ierr is None:
-                    ok, detail = verify_tree(target, manifest, infos)
-            except Exception as e:
-                detail = f"verification could not run: {e}"
+        ok, detail = _verify_recorded(target, d)
         if ok:
             if old_tree and os.path.exists(old_tree):
                 shutil.rmtree(old_tree, ignore_errors=True)
@@ -493,7 +695,7 @@ def do_restore(zip_path, target):
 
         staging = tempfile.mkdtemp(prefix=".nas-staging-", dir=parent)
         journal = {"version": 1, "state": "staging", "run_id": lock.run_id,
-                   "pid": os.getpid(), "target": os.path.abspath(target),
+                   "pid": os.getpid(), "target": canonical(target),
                    "staging": staging, "old_tree": None,
                    "zip_path": os.path.abspath(zip_path),
                    "updated": datetime.datetime.now().isoformat(timespec="seconds")}
@@ -505,13 +707,7 @@ def do_restore(zip_path, target):
             for info in infos:
                 if info.filename == "MANIFEST.json":
                     continue
-                dest = os.path.join(staging, info.filename)
-                os.makedirs(os.path.dirname(dest), exist_ok=True)
-                # Stream in 1 MB chunks: a large entry never sits fully in
-                # memory. Nested archives are copied as inert data files.
-                with z.open(info) as src, open(dest, "wb") as out_f:
-                    shutil.copyfileobj(src, out_f, 1024 * 1024)
-                    fsync_file(out_f)
+                extract_entry(z, info, staging)
                 restored += 1
                 total_bytes += info.file_size
                 count += 1
@@ -626,8 +822,9 @@ def do_restore(zip_path, target):
 def do_recover(target, force_stale_lock):
     parent = os.path.dirname(os.path.abspath(target))
     lock_path = os.path.join(parent, LOCK_NAME)
-    # A corrupt journal stops recovery before the lock is even considered:
-    _d, jerr = read_journal(parent)
+    # A corrupt, moved or cross-target journal stops recovery before the
+    # lock is even considered, and before any filesystem mutation:
+    _d, jerr = read_journal(parent, expected_target=target)
     if jerr:
         print(f"RECOVERY REFUSED — {jerr}. Nothing was touched. "
               f"Inspect {journal_file(parent)} manually.")
@@ -695,26 +892,34 @@ def do_recover(target, force_stale_lock):
 # ---------------------------------------------------------------- main
 def main():
     args = sys.argv[1:]
-    if args and args[0] == "--recover":
+    try:
+        if args and args[0] == "--recover":
+            if len(args) < 2:
+                print(__doc__)
+                return 1
+            return do_recover(args[1], "--force-stale-lock" in args)
         if len(args) < 2:
             print(__doc__)
             return 1
-        return do_recover(args[1], "--force-stale-lock" in args)
-    if len(args) < 2:
-        print(__doc__)
-        return 1
-    zip_path = args[0]
-    if args[1] == "--verify-only":
-        z = zipfile.ZipFile(zip_path)
-        infos, d, manifest, ierr = inspect_zip(z)
-        if ierr:
-            print(f"VERIFY FAILED — {ierr}")
-            return 1
-        print(f"VERIFY-ONLY PASSED — {len(infos)} files; required: all present; "
-              f"projects: {len(d['projects'])}, characters: {len(d['characters'])}; "
-              f"manifest: {'verified' if manifest else 'absent (older export)'}")
-        return 0
-    return do_restore(zip_path, args[1])
+        zip_path = args[0]
+        if args[1] == "--verify-only":
+            z = zipfile.ZipFile(zip_path)
+            infos, d, manifest, ierr = inspect_zip(z)
+            if ierr:
+                print(f"VERIFY FAILED — {ierr}")
+                return 1
+            print(f"VERIFY-ONLY PASSED — {len(infos)} files; required: all present; "
+                  f"projects: {len(d['projects'])}, characters: {len(d['characters'])}; "
+                  f"manifest: {'verified' if manifest else 'absent (older export)'}")
+            return 0
+        return do_restore(zip_path, args[1])
+    except DurabilityError as e:
+        # Fail closed (audit fix 3): no further mutation happened after
+        # the failed durability point, and the journal on disk (if any)
+        # is checksum-valid, so --recover can finish or roll back.
+        print(f"ABORTED — durability failure: {e}. No further changes were "
+              f"made; run --recover on the target to reconcile the journal.")
+        return 4
 
 if __name__ == "__main__":
     sys.exit(main())

@@ -1,0 +1,111 @@
+=== FIX PHASE 3 VERIFICATION LOG - 2026-11-13 ===
+Started: 2026-11-13T06:48:03+05:00
+Baseline repo commit: 3f9062569d89d80bfac109dc23827ce6d3f51512
+pre-fix3 restore_studio.py sha256: 3e78237167fc191036502dbe083a4356246526aa105eba3c245a8a99540b1bb0
+backup copy sha256:               3e78237167fc191036502dbe083a4356246526aa105eba3c245a8a99540b1bb0
+real NAS-STUDIO tree BEFORE fix3: 7f6aafe1efcfc0d1166aebc31e129cda953615b92bdf4aac803b591cf2a16ae1 (31 files)
+=== fix phase 3 battery ===
+N1 Windows/absolute path battery (16 evil entries): PASS — all rejected at inspect
+N1b target untouched by N1 battery: PASS — holder hash e3b0c44298fc
+N2 containment + symlink chain + exclusive create (unit): PASS — 4 sub-checks: [True, True, True, True]
+N3a fsync EIO fails closed, journal recoverable: PASS — abort rc=4; studio intact=True; recover rc=0
+N3b fsync EINVAL = unsupported notice, restore completes: PASS — rc=0, notice=True
+N3c fsync ENOSPC fails closed: PASS — rc=4
+N4 cross-target recovery refused, own-target recovery works: PASS — recover(B) rc=2 mismatch-refused; recover(A) rc=0, A restored
+Traceback (most recent call last):
+  File "/home/hatch/workspace/nauman-action-studios/run_fix3_tests.py", line 187, in <module>
+    shutil.copy(jrnl, os.path.join(P2, ".nas-restore-journal.json"))
+  File "/usr/lib/python3.12/shutil.py", line 435, in copy
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+  File "/usr/lib/python3.12/shutil.py", line 260, in copyfile
+    with open(src, 'rb') as fsrc:
+         ^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/tmp/fix3-tests/n4/.nas-restore-journal.json'
+--- battery rerun after N5 harness fix ---
+=== fix phase 3 battery ===
+N1 Windows/absolute path battery (16 evil entries): PASS — all rejected at inspect
+N1b target untouched by N1 battery: PASS — holder hash e3b0c44298fc
+N2 containment + symlink chain + exclusive create (unit): PASS — 4 sub-checks: [True, True, True, True]
+N3a fsync EIO fails closed, journal recoverable: PASS — abort rc=4; studio intact=True; recover rc=0
+N3b fsync EINVAL = unsupported notice, restore completes: PASS — rc=0, notice=True
+N3c fsync ENOSPC fails closed: PASS — rc=4
+N4 cross-target recovery refused, own-target recovery works: PASS — recover(B) rc=2 mismatch-refused; recover(A) rc=0, A restored
+Traceback (most recent call last):
+  File "/home/hatch/workspace/nauman-action-studios/run_fix3_tests.py", line 190, in <module>
+    fresh_studio(A2)
+  File "/home/hatch/workspace/nauman-action-studios/run_fix3_tests.py", line 48, in fresh_studio
+    assert rc == 0, out
+           ^^^^^^^
+AssertionError: Manifest verified: 24 files, SHA-256 all match, no unlisted files.
+RESTORE ABORTED — not enough free space at /tmp/fix3-tests/n5a/A: need ~66699931 bytes, only 51466240 free — restore refused before writing anything
+
+--- harness note: first battery run aborted at N5 (script bug: journal already consumed by N4). Second run aborted at N5 setup: /tmp (512MB) exhausted by ~20 sandbox restores (backup ZIPs); the tool's free-space guard correctly refused. Sandbox moved to the disk-backed workspace; full battery re-run follows. ---
+=== fix phase 3 battery ===
+N1 Windows/absolute path battery (16 evil entries): PASS — all rejected at inspect
+N1b target untouched by N1 battery: PASS — holder hash e3b0c44298fc
+N2 containment + symlink chain + exclusive create (unit): PASS — 4 sub-checks: [True, True, True, True]
+N3a fsync EIO fails closed, journal recoverable: PASS — abort rc=4; studio intact=True; recover rc=0
+N3b fsync EINVAL = unsupported notice, restore completes: PASS — rc=0, notice=True
+N3c fsync ENOSPC fails closed: PASS — rc=4
+N4 cross-target recovery refused, own-target recovery works: PASS — recover(B) rc=2 mismatch-refused; recover(A) rc=0, A restored
+N5 journal moved to another folder refused: PASS — rc=2: RECOVERY REFUSED — journal target's parent does not match the folder the journal was found in (journ
+N6 canonical path comparison (normalisation variants): PASS — 4 spellings -> 1 canonical path
+Traceback (most recent call last):
+  File "/home/hatch/workspace/nauman-action-studios/run_fix3_tests.py", line 209, in <module>
+    h = os.path.join(SB, "t1"); want, _ = fresh_studio(h)
+                                          ^^^^^^^^^^^^^^^
+  File "/home/hatch/workspace/nauman-action-studios/run_fix3_tests.py", line 48, in fresh_studio
+    assert rc == 0, out
+           ^^^^^^^
+AssertionError: RESTORE REFUSED — a restore journal exists but cannot be trusted (journal target mismatch: the journal records /home/hatch/workspace/.fix3-test-sandbox/n3c but the supplied target is /home/hatch/workspace/.fix3-test-sandbox/t1 — a journal is never acted on for another target) — nothing was touched; inspect /home/hatch/workspace/.fix3-test-sandbox/.nas-restore-journal.json manually
+
+--- harness note: third run reached T1 and stopped: all holders shared ONE parent, so N3c's leftover journal (correctly) refused T1 via the new target-mismatch check — the fix working as designed; harness isolation flaw. Each test now gets its own parent folder; full battery re-run follows. ---
+=== fix phase 3 battery ===
+N1 Windows/absolute path battery (16 evil entries): PASS — all rejected at inspect
+N1b target untouched by N1 battery: PASS — holder hash e3b0c44298fc
+N2 containment + symlink chain + exclusive create (unit): PASS — 4 sub-checks: [True, True, True, True]
+N3a fsync EIO fails closed, journal recoverable: PASS — abort rc=4; studio intact=True; recover rc=0
+N3b fsync EINVAL = unsupported notice, restore completes: PASS — rc=0, notice=True
+N3c fsync ENOSPC fails closed: PASS — rc=4
+N4 cross-target recovery refused, own-target recovery works: PASS — recover(B) rc=2 mismatch-refused; recover(A) rc=0, A restored
+N5 journal moved to another folder refused: PASS — rc=2: RECOVERY REFUSED — journal target's parent does not match the folder the journal was found in (journ
+N6 canonical path comparison (normalisation variants): PASS — 4 spellings -> 1 canonical path
+T1 extra unlisted file rejected (verify + restore): PASS — verify rc=1, restore rc=1
+T2b manifest-listed file missing from ZIP rejected: FAIL — rc=0
+T3 legit export restore complete + byte-identical + clean: FAIL — 24 files, leftovers=[]
+T4/T4b collision archives: studio byte-identical after both: PASS — rc=1, rc2=1
+T5 kill during staging -> recover cleans, intact: PASS — crash rc=86, recover rc=0, hash match=True
+T6 kill mid-swap -> recover restores original: PASS — crash rc=86, recover rc=0, hash match=True
+T7 kill after swap -> recover completes with NEW studio: PASS — crash rc=86, recover rc=0
+T8 corrupt-after-swap -> same-run rollback: PASS — rc=1, failed-tree kept=True
+T9 corrupt journal x4 refused by restore AND recover, intact: FAIL — truncated: 3/2; bad-checksum: 3/2; unknown-state: 3/2; outside-path: 3/2; cleanup recover rc=0
+T10 corrupt lock: refused, override-only, lock preserved: PASS — rcs 3/2/0, preserved=True
+T11 live lock: 2nd restore + recover refused, lock untouched: PASS — rcs 3/3, lock unchanged=True, first restore rc=0
+T12 PID reuse judged dead; live PID+start-time refused: PASS — rcs 0/3
+/usr/lib/python3.12/zipfile/__init__.py:1620: UserWarning: Duplicate name: 'a.txt'
+  return self._open_to_write(zinfo, force_zip64=force_zip64)
+/usr/lib/python3.12/zipfile/__init__.py:1620: UserWarning: Duplicate name: 'NAS-STUDIO/dup.txt'
+  return self._open_to_write(zinfo, force_zip64=force_zip64)
+T13 ZIP security re-run (symlink/traversal/dup x2/bomb): PASS — [True, True, True, True, True]
+T14 dual recovery: single winner, studio intact: PASS — rcs 0/3
+=== battery done: 20/23 PASS; fails: ['T2b', 'T3', 'T9'] ===
+--- battery run analysis: 20/23 PASS. T2b/T3/T9 FAILs are HARNESS defects, not product regressions:
+T2b: harness export_variant popped the dropped file from the manifest too, making the variant self-consistent (rc=0 correct).
+T3: harness compared restored tree (24 files, the export's contents) against the live studio tree (31 files incl. later exports) — wrong invariant; correct invariant is equality with the export's contents.
+T9: crashed setup left its LOCK behind; restore correctly refused on the lock (rc=3) before the journal check — harness must isolate the journal as the only leftover (lock interplay is covered by T10/T11/T14). Corrected retests follow. ---
+=== fix phase 3 corrected retests ===
+T2b (corrected) missing-listed-file rejected: PASS — rc=1
+T3 (corrected) restore == export contents, clean: PASS — 24 files vs export 24
+T9 (corrected) corrupt journal x4 refused by restore AND recover: PASS — truncated: 2/2; bad-checksum: 2/2; unknown-state: 2/2; outside-path: 2/2; cleanup recover rc=0
+=== retests done ===
+
+=== APP SYNC (fix phase 3) — Control Room artifact ===
+Embedded RESTORE_DOC replaced with the phase-3 canonical tools/restore_studio.py and verified byte-identical by three methods (Python splice decode, independent Python decode+hash, Node vm evaluation with Buffer byte-equality against the disk file):
+  embedded RESTORE_DOC: 43,719 bytes, sha256 e5847a69a4429ddd187a01abed8f875fcd626d4a34709a34d1ea87847f747d14 == canonical file (MATCH)
+  SCRIPT_GEN decoded sha256: 4c5d62d1c046892e15a969b030c6ee4aea70a40474dba34649d1f038dd3310ea (unchanged from fix phase 2)
+  SCRIPT_EXP decoded sha256: aa69ae8407aaa9f72d020f86ffc175f55ba1cbd1e2db6495e9ee46d6dd4f3381 (unchanged from fix phase 2)
+Node regression harness on the edited/exported page (run twice, identical results):
+  PBKDF2/PIN suite: 49/49 PASS
+  studioToAppData adapter suite: 29/29 PASS
+  Full inline script parse: PASS
+Exported HTML: /home/hatch/workspace/your_files/nauman-action-studios-control-room/nauman-action-studios-control-room.html
