@@ -25,12 +25,35 @@ Safety:
     available), and refuses to walk through symlinked folders.
     (Audit fix phase 3, 2026-11-13.)
   - Directory fsyncs FAIL CLOSED: only explicitly unsupported cases
-    (Windows, or EINVAL/ENOTSUP from the filesystem) degrade — with a
-    printed notice — to file fsyncs + journal checksums. Genuine I/O
-    errors (EIO, ENOSPC, ...) at the mandatory durability points
-    (journal writes, swap renames) abort the operation before any
-    further change; the journal left on disk stays checksum-valid and
-    recoverable. (Audit fix phase 3, 2026-11-13.)
+    degrade — with a printed notice — to file fsyncs + journal
+    checksums. Genuine I/O errors (EIO, ENOSPC, ...) at the mandatory
+    durability points (journal writes, swap renames) abort the
+    operation before any further change; the journal left on disk
+    stays checksum-valid and recoverable. (Audit fix phase 3,
+    2026-11-13.)
+  - The unsupported classification is NARROW (audit fix phase 4,
+    2026-11-13): an error is 'unsupported' only when it is positively
+    identified — a filesystem-level EINVAL/ENOTSUP/EOPNOTSUPP from the
+    fsync itself, or, on Windows, the specific case proven by a
+    one-time control probe on a neutral directory: os.open() cannot
+    open a directory handle for fsync there (PermissionError). The
+    exact documented limitation is that limitation of the os.open
+    mechanism on Windows — nothing more. EACCES on other platforms,
+    and EIO/ENOSPC/EROFS or any unexpected error on ANY platform
+    (Windows included), are genuine failures and fail closed.
+    File-level fsync failures are genuine on every platform and are
+    reported as durability failures (exit 4), never as tracebacks.
+    On Windows the deliberate fallback is: file-level fsyncs (which
+    do work there) + journal checksums + evidence-based recovery —
+    and no stronger durability is claimed than that.
+  - The journal's temporary file is created EXCLUSIVELY (O_EXCL +
+    O_NOFOLLOW where available) under its fixed name (audit fix
+    phase 4, 2026-11-13): a pre-existing temp that is a symlink or
+    not a regular file is refused untouched (possible plant); a stale
+    regular temp is preserved — never overwritten — by an
+    overwrite-safe, race-safe rename-aside (hardlink claim; the
+    existing destination is never replaced) with its SHA-256 and
+    exact path printed as evidence.
   - A journal is acted on ONLY for the target it records: the recorded
     target is compared, canonically (platform-aware: Windows case
     folding, path normalisation, symlink resolution), with the target
@@ -105,43 +128,91 @@ _DIR_FSYNC_UNSUPPORTED_ERRNOS = {
     getattr(errno, "EOPNOTSUPP", errno.EINVAL),
 }
 _dir_fsync_notice_shown = False
+_dir_fsync_probe = {"done": False, "unsupported": False}
 
-def fsync_dir(path, mandatory=True):
-    """Directory fsync with explicit failure handling (audit fix 3).
-
-    Returns True when the fsync was performed. Only EXPLICITLY
-    unsupported cases — Windows (os.name == 'nt', where a directory
-    cannot be opened for fsync this way), or EINVAL / ENOTSUP /
-    EOPNOTSUPP from the filesystem — degrade, with a one-time printed
-    notice, to file-level fsyncs + journal checksums. Every other
-    failure (EIO, ENOSPC, EROFS, ...) is a genuine I/O error: at a
-    mandatory durability point (journal writes, swap renames) it raises
-    DurabilityError and the operation fails closed; at a non-mandatory
-    point (lock bookkeeping, cleanup) it prints a warning."""
+def _degrade_dir_fsync():
+    """Print the unsupported notice once per process; return False."""
     global _dir_fsync_notice_shown
+    if not _dir_fsync_notice_shown:
+        _dir_fsync_notice_shown = True
+        print("note: directory fsync is not supported via os.open on this "
+              "platform/filesystem \u2014 durability relies on file-level "
+              "fsyncs and journal checksums.", file=sys.stderr)
+    return False
+
+def _probe_dir_fsync_platform():
+    """One-time CONTROL experiment on a neutral directory (the system
+    temp dir): can this platform fsync a directory through os.open at
+    all? 'Unsupported' is concluded ONLY from positive identification:
+    on Windows, os.open() raising EACCES/EPERM for a directory (the
+    documented os.open limitation there), or EINVAL/ENOTSUP from the
+    attempt. Every other outcome \u2014 success, or a genuine error \u2014
+    leaves the platform classified as 'supported', so real failures
+    are never re-labelled as unsupported."""
+    if _dir_fsync_probe["done"]:
+        return _dir_fsync_probe["unsupported"]
+    _dir_fsync_probe["done"] = True
+    result = False
     try:
-        fd = os.open(path, os.O_RDONLY)
+        fd = os.open(tempfile.gettempdir(), os.O_RDONLY)
         try:
             os.fsync(fd)
         finally:
             os.close(fd)
-        return True
     except OSError as e:
-        if os.name == "nt" or e.errno in _DIR_FSYNC_UNSUPPORTED_ERRNOS:
-            if not _dir_fsync_notice_shown:
-                _dir_fsync_notice_shown = True
-                print("note: directory fsync is not supported on this "
-                      "platform/filesystem — durability relies on file-level "
-                      "fsyncs and journal checksums.", file=sys.stderr)
-            return False
-        if mandatory:
-            raise DurabilityError(f"directory fsync failed for {path}: {e}")
-        print(f"warning: directory fsync failed for {path}: {e}", file=sys.stderr)
-        return False
+        if os.name == "nt" and e.errno in (errno.EACCES, errno.EPERM):
+            result = True
+        elif e.errno in _DIR_FSYNC_UNSUPPORTED_ERRNOS:
+            result = True
+    _dir_fsync_probe["unsupported"] = result
+    return result
+
+def _dir_fsync_failed(e, path, mandatory):
+    if mandatory:
+        raise DurabilityError(f"directory fsync failed for {path}: {e}")
+    print(f"warning: directory fsync failed for {path}: {e}", file=sys.stderr)
+    return False
+
+def fsync_dir(path, mandatory=True):
+    """Directory fsync with explicit, NARROW failure handling
+    (audit fixes 3+4).
+
+    Returns True when the fsync was performed. Degradation (printed
+    notice, returns False) happens ONLY for positively identified
+    unsupported cases: a filesystem-level EINVAL/ENOTSUP/EOPNOTSUPP
+    from the fsync itself, or \u2014 on Windows \u2014 an open-time
+    EACCES/EPERM when the control probe has proven that os.open
+    cannot open directory handles for fsync on this platform.
+    Everything else (EIO, ENOSPC, EROFS, EACCES elsewhere, unexpected
+    errors on ANY platform) is a genuine I/O failure: at a mandatory
+    durability point it raises DurabilityError (fail closed); at a
+    non-mandatory point it prints a warning."""
+    try:
+        fd = os.open(path, os.O_RDONLY)
+    except OSError as e:
+        if e.errno in (errno.EACCES, errno.EPERM) and os.name == "nt" \
+                and _probe_dir_fsync_platform():
+            return _degrade_dir_fsync()
+        return _dir_fsync_failed(e, path, mandatory)
+    try:
+        os.fsync(fd)
+    except OSError as e:
+        if e.errno in _DIR_FSYNC_UNSUPPORTED_ERRNOS:
+            return _degrade_dir_fsync()
+        return _dir_fsync_failed(e, path, mandatory)
+    finally:
+        os.close(fd)
+    return True
 
 def fsync_file(f):
-    f.flush()
-    os.fsync(f.fileno())
+    """File fsync. A failure is a genuine I/O error on every platform:
+    it is raised as a DurabilityError so the operation fails closed
+    with a clear message instead of a raw traceback."""
+    try:
+        f.flush()
+        os.fsync(f.fileno())
+    except OSError as e:
+        raise DurabilityError(f"file fsync failed: {e}")
 
 # ---------------------------------------------------------------- processes
 def proc_start_time(pid):
@@ -242,15 +313,96 @@ def canonical(p):
 def journal_file(parent):
     return os.path.join(parent, JOURNAL_NAME)
 
+class JournalError(Exception):
+    """The journal could not be written safely (e.g. a suspicious
+    pre-existing temp file). Nothing was overwritten; the operation
+    refuses instead of guessing."""
+
+def _now_stamp():
+    return datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+
+def _preserve_stale_temp(tmp):
+    """Preserve a stale REGULAR journal temp without ever overwriting
+    anything (audit fix 4): the temp is claimed aside by hardlink to
+    the first free '.stale-<stamp>' name \u2014 os.link fails atomically
+    if the name is taken, so an existing destination is NEVER replaced
+    and the claim is race-safe \u2014 then the temp name is unlinked.
+    If hardlinking is unavailable on this filesystem, an exclusive-
+    create copy is used instead (still never replacing). Prints the
+    evidence line and returns (aside_path, sha256, size)."""
+    with open(tmp, "rb") as f:
+        data = f.read()
+    digest = hashlib.sha256(data).hexdigest()
+    stamp = _now_stamp()
+    aside = None
+    for i in range(1, 100):
+        candidate = tmp + f".stale-{stamp}" + ("" if i == 1 else f"-{i}")
+        try:
+            os.link(tmp, candidate)
+            aside = candidate
+            break
+        except FileExistsError:
+            continue
+        except OSError:
+            try:
+                fd = os.open(candidate, os.O_WRONLY | os.O_CREAT | os.O_EXCL
+                             | getattr(os, "O_NOFOLLOW", 0), 0o644)
+            except FileExistsError:
+                continue
+            with os.fdopen(fd, "wb") as out:
+                out.write(data)
+                fsync_file(out)
+            aside = candidate
+            break
+    if aside is None:
+        raise JournalError(f"could not preserve the stale journal temp {tmp}: "
+                           f"no free aside name found")
+    os.unlink(tmp)
+    fsync_dir(os.path.dirname(tmp) or ".", mandatory=False)
+    print(f"note: a stale journal temp was preserved at {aside} "
+          f"(sha256 {digest}, {len(data)} bytes) and a fresh temp was used")
+    return aside, digest, len(data)
+
 def write_journal(parent, payload):
     body = dict(payload)
     body["checksum"] = hashlib.sha256(
         json.dumps(body, sort_keys=True).encode()).hexdigest()
     tmp = journal_file(parent) + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
+    # Stale-temp protocol (audit fix 4): the temp is created
+    # EXCLUSIVELY below, so anything already at that path is dealt
+    # with first \u2014 a symlink or non-regular object is refused
+    # untouched (possible plant); a stale regular file is preserved
+    # aside, never overwritten.
+    try:
+        st = os.lstat(tmp)
+    except FileNotFoundError:
+        st = None
+    if st is not None:
+        if stat.S_ISLNK(st.st_mode) or not stat.S_ISREG(st.st_mode):
+            raise JournalError(
+                f"the journal temp {tmp} already exists and is not a "
+                f"regular file (possible planted link) \u2014 refusing to "
+                f"write the journal; nothing was overwritten. Inspect "
+                f"and remove it manually.")
+        _preserve_stale_temp(tmp)
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        fd = os.open(tmp, flags, 0o644)
+    except FileExistsError:
+        raise JournalError(
+            f"the journal temp {tmp} appeared during the write "
+            f"(possible race or planted file) \u2014 refusing to overwrite "
+            f"it. Inspect it manually.")
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
         f.write(json.dumps(body, indent=2))
         fsync_file(f)
-    os.rename(tmp, journal_file(parent))
+    try:
+        os.rename(tmp, journal_file(parent))
+    except FileNotFoundError:
+        raise JournalError(
+            f"the journal temp {tmp} disappeared during the write "
+            f"(removed by another process) — the journal write was "
+            f"refused safely rather than guessed at.")
     fsync_dir(parent)
 
 def read_journal(parent, expected_target=None):
@@ -727,6 +879,8 @@ def do_restore(zip_path, target):
                 return 1
             print(f"Staged verification: "
                   f"{len(manifest) if manifest else len(infos)} files verified.")
+        except DurabilityError:
+            raise
         except Exception as e:
             print(f"RESTORE ABORTED — extraction failed in staging "
                   f"({type(e).__name__}: {e}); existing studio untouched.")
@@ -920,6 +1074,11 @@ def main():
         print(f"ABORTED — durability failure: {e}. No further changes were "
               f"made; run --recover on the target to reconcile the journal.")
         return 4
+    except JournalError as e:
+        # The journal could not be written safely (audit fix 4):
+        # nothing was overwritten; a human inspects the temp path.
+        print(f"REFUSED — journal safety: {e}")
+        return 2
 
 if __name__ == "__main__":
     sys.exit(main())

@@ -1,0 +1,92 @@
+=== FIX PHASE 4 VERIFICATION LOG - 2026-11-13 ===
+Started: 2026-11-13T07:38:43+05:00
+Baseline repo commit: 2ca5678c37e25ee4cbcb407e572ce429f55e5d81
+pre-fix4 restore_studio.py sha256: e5847a69a4429ddd187a01abed8f875fcd626d4a34709a34d1ea87847f747d14
+backup copy sha256:               e5847a69a4429ddd187a01abed8f875fcd626d4a34709a34d1ea87847f747d14
+real NAS-STUDIO tree BEFORE fix4: e320d501b91038dea9e7dd2385f03794fa2dc748ebcf5883ca51e404c83fbe17 (32 files)
+=== fix phase 4 battery (Windows cases are SIMULATIONS) ===
+W1 SIMULATED Windows: dir-open PermissionError degrades with notice: PASS — rc=0, notice=True
+W2 SIMULATED Windows: dir-fsync EIO fails CLOSED (not 'unsupported'): PASS — rc=4 (fix-3 code would have silently degraded here)
+B1 planted symlink at journal temp: refused, victim byte-identical: PASS — rc=2, victim intact, studio intact, plant untouched
+B2 stale regular temp: preserved aside with evidence, restore completes: PASS — rc=0, aside=['.nas-restore-journal.json.tmp.stale-20261113-074047']
+note: a stale journal temp was preserved at /home/hatch/workspace/.fix4-test-sandbox/b2c/.nas-restore-journal.json.tmp.stale-TESTSTAMP-2 (sha256 e5464a6a7414b39ffa7820d0ec3c4ece3c8aaf980b8bf0cd67e62bc179f4ed8c, 12 bytes) and a fresh temp was used
+B2c rename-aside collision: existing destination never replaced (unit): PASS — aside=.nas-restore-journal.json.tmp.stale-TESTSTAMP-2
+Exception in thread Thread-1 (racer):
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+    self.run()
+  File "/usr/lib/python3.12/threading.py", line 1010, in run
+    self._target(*self._args, **self._kwargs)
+  File "/home/hatch/workspace/nauman-action-studios/run_fix4_tests.py", line 132, in racer
+    os.symlink(rvictim, rtmp)
+FileExistsError: [Errno 17] File exists: '/home/hatch/workspace/.fix4-test-sandbox/brace/victim.txt' -> '/home/hatch/workspace/.fix4-test-sandbox/brace/.nas-restore-journal.json.tmp'
+Brace TOCTOU race: symlink flipper vs 200 journal writes, victim never written: PASS — writes ok=200, safe refusals=0, unexpected=0, victim intact=True
+=== fix4 battery done: 6/6 PASS; fails: [] ===
+--- fix4 battery re-run: first run 6/6 PASS but the Brace racer thread died early on its own FileExistsError (harness bug, caught nothing after); racer hardened, full battery re-run follows. First-run output above stays in the log. ---
+=== fix phase 4 battery (Windows cases are SIMULATIONS) ===
+W1 SIMULATED Windows: dir-open PermissionError degrades with notice: PASS — rc=0, notice=True
+W2 SIMULATED Windows: dir-fsync EIO fails CLOSED (not 'unsupported'): PASS — rc=4 (fix-3 code would have silently degraded here)
+B1 planted symlink at journal temp: refused, victim byte-identical: PASS — rc=2, victim intact, studio intact, plant untouched
+B2 stale regular temp: preserved aside with evidence, restore completes: PASS — rc=0, aside=['.nas-restore-journal.json.tmp.stale-20261113-074137']
+note: a stale journal temp was preserved at /home/hatch/workspace/.fix4-test-sandbox/b2c/.nas-restore-journal.json.tmp.stale-TESTSTAMP-2 (sha256 e5464a6a7414b39ffa7820d0ec3c4ece3c8aaf980b8bf0cd67e62bc179f4ed8c, 12 bytes) and a fresh temp was used
+B2c rename-aside collision: existing destination never replaced (unit): PASS — aside=.nas-restore-journal.json.tmp.stale-TESTSTAMP-2
+Brace TOCTOU race: symlink flipper vs 200 journal writes, victim never written: FAIL — writes ok=20, safe refusals=161, unexpected=19, victim intact=True
+=== fix4 battery done: 5/6 PASS; fails: ['Brace'] ===
+--- Brace run 2 analysis: victim intact in ALL runs (the core never-overwrite property held), but 19/200 writes crashed with a raw FileNotFoundError when the racer deleted the temp mid-write: a controlled JournalError refusal is the correct outcome there. write_journal's rename step now converts a vanished temp into JournalError. Battery re-run follows; both earlier runs stay in the log. ---
+=== fix phase 4 battery (Windows cases are SIMULATIONS) ===
+W1 SIMULATED Windows: dir-open PermissionError degrades with notice: PASS — rc=0, notice=True
+W2 SIMULATED Windows: dir-fsync EIO fails CLOSED (not 'unsupported'): PASS — rc=4 (fix-3 code would have silently degraded here)
+B1 planted symlink at journal temp: refused, victim byte-identical: PASS — rc=2, victim intact, studio intact, plant untouched
+B2 stale regular temp: preserved aside with evidence, restore completes: PASS — rc=0, aside=['.nas-restore-journal.json.tmp.stale-20261113-074224']
+note: a stale journal temp was preserved at /home/hatch/workspace/.fix4-test-sandbox/b2c/.nas-restore-journal.json.tmp.stale-TESTSTAMP-2 (sha256 e5464a6a7414b39ffa7820d0ec3c4ece3c8aaf980b8bf0cd67e62bc179f4ed8c, 12 bytes) and a fresh temp was used
+B2c rename-aside collision: existing destination never replaced (unit): PASS — aside=.nas-restore-journal.json.tmp.stale-TESTSTAMP-2
+Brace TOCTOU race: symlink flipper vs 200 journal writes, victim never written: PASS — writes ok=21, safe refusals=179, unexpected=0, victim intact=True
+=== fix4 battery done: 6/6 PASS; fails: [] ===
+--- fix-3 battery re-run under fix-4 code ---
+=== fix phase 3 battery ===
+N1 Windows/absolute path battery (16 evil entries): PASS — all rejected at inspect
+N1b target untouched by N1 battery: PASS — holder hash e3b0c44298fc
+N2 containment + symlink chain + exclusive create (unit): PASS — 4 sub-checks: [True, True, True, True]
+N3a fsync EIO fails closed, journal recoverable: PASS — abort rc=4; studio intact=True; recover rc=0
+N3b fsync EINVAL = unsupported notice, restore completes: FAIL — rc=0, notice=False
+N3c fsync ENOSPC fails closed: PASS — rc=4
+N4 cross-target recovery refused, own-target recovery works: PASS — recover(B) rc=2 mismatch-refused; recover(A) rc=0, A restored
+N5 journal moved to another folder refused: PASS — rc=2: RECOVERY REFUSED — journal target's parent does not match the folder the journal was found in (journ
+N6 canonical path comparison (normalisation variants): PASS — 4 spellings -> 1 canonical path
+T1 extra unlisted file rejected (verify + restore): PASS — verify rc=1, restore rc=1
+T2b manifest-listed file missing from ZIP rejected: FAIL — rc=0
+T3 legit export restore complete + byte-identical + clean: FAIL — 24 files, leftovers=[]
+T4/T4b collision archives: studio byte-identical after both: PASS — rc=1, rc2=1
+T5 kill during staging -> recover cleans, intact: PASS — crash rc=86, recover rc=0, hash match=True
+T6 kill mid-swap -> recover restores original: PASS — crash rc=86, recover rc=0, hash match=True
+T7 kill after swap -> recover completes with NEW studio: PASS — crash rc=86, recover rc=0
+T8 corrupt-after-swap -> same-run rollback: PASS — rc=1, failed-tree kept=True
+T9 corrupt journal x4 refused by restore AND recover, intact: FAIL — truncated: 3/2; bad-checksum: 3/2; unknown-state: 3/2; outside-path: 3/2; cleanup recover rc=0
+T10 corrupt lock: refused, override-only, lock preserved: PASS — rcs 3/2/0, preserved=True
+T11 live lock: 2nd restore + recover refused, lock untouched: PASS — rcs 3/3, lock unchanged=True, first restore rc=0
+T12 PID reuse judged dead; live PID+start-time refused: PASS — rcs 0/3
+/usr/lib/python3.12/zipfile/__init__.py:1620: UserWarning: Duplicate name: 'a.txt'
+  return self._open_to_write(zinfo, force_zip64=force_zip64)
+/usr/lib/python3.12/zipfile/__init__.py:1620: UserWarning: Duplicate name: 'NAS-STUDIO/dup.txt'
+  return self._open_to_write(zinfo, force_zip64=force_zip64)
+T13 ZIP security re-run (symlink/traversal/dup x2/bomb): PASS — [True, True, True, True, True]
+T14 dual recovery: single winner, studio intact: PASS — rcs 0/3
+=== battery done: 19/23 PASS; fails: ['N3b', 'T2b', 'T3', 'T9'] ===
+--- fix-3 battery re-run analysis (19/23): T2b/T3/T9 are the SAME known harness defects as the fix-3 first run (run_fix3_tests.py was never merged with the corrections in run_fix3_retests.py) — corrected retests re-run separately under fix-4 code. N3b is REAL but cosmetic: behaviour correct (rc=0, restore completed, degrade happened) but fix 4 reworded the notice ('is unavailable via os.open') so the test's expected phrase 'not supported' was absent. Notice wording restored to include 'not supported via os.open'; N3b re-verified standalone below. ---
+N3b re-verify (fix-4 code, EINVAL injection): rc=0, notice 'not supported' present=True -> PASS
+=== fix phase 3 corrected retests ===
+T2b (corrected) missing-listed-file rejected: PASS — rc=1
+T3 (corrected) restore == export contents, clean: PASS — 24 files vs export 24
+T9 (corrected) corrupt journal x4 refused by restore AND recover: PASS — truncated: 2/2; bad-checksum: 2/2; unknown-state: 2/2; outside-path: 2/2; cleanup recover rc=0
+=== retests done ===
+real NAS-STUDIO tree AFTER all fix4 tests: e320d501b91038dea9e7dd2385f03794fa2dc748ebcf5883ca51e404c83fbe17 (32 files)
+fix4 baseline was:                         e320d501b91038dea9e7dd2385f03794fa2dc748ebcf5883ca51e404c83fbe17 (32 files)
+MATCH: True
+new restore_studio.py: 50867 bytes, sha256: 64e9c0a0f8591d63e6bebc8105011c3754e287d7b52c26c31236ac279c1bb927
+--- app embedded sync (fix phase 4) ---
+Embedded RESTORE_DOC replaced via artifact.edit (packaging sync only; no design/feature/behavior change). Exported page: /home/hatch/workspace/your_files/nauman-action-studios-control-room/nauman-action-studios-control-room.html
+Decoded RESTORE_DOC: 50,867 bytes, sha256 64e9c0a0f8591d63e6bebc8105011c3754e287d7b52c26c31236ac279c1bb927 — byte-identical to canonical tools/restore_studio.py (verified by the builder via Node evaluation + Buffer equality, and independently from the exported page via literal extraction + JS decode + byte compare).
+SCRIPT_GEN unchanged: 3,828 bytes, sha256 4c5d62d1c046892e15a969b030c6ee4aea70a40474dba34649d1f038dd3310ea
+SCRIPT_EXP unchanged: 1,746 bytes, sha256 aa69ae8407aaa9f72d020f86ffc175f55ba1cbd1e2db6495e9ee46d6dd4f3381
+Full inline script parse: PASS (vm.Script, on the exported page).
+Regression harness (builder, run twice, identical): PBKDF2/PIN suite 49/49 PASS; studioToAppData adapter suite 29/29 PASS.
