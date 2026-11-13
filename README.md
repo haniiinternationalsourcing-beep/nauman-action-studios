@@ -16,15 +16,18 @@ independent technical audit. Everything is byte-exact as delivered.
   only, by design. The PIN lock is a client-side device lock, honestly
   labelled as such - it is NOT server-grade security.
 - `tools/` - `generate_data.py` (canonical, schema v2), `export_studio.py`
-  (backup ZIP with SHA-256 manifest), `restore_studio.py` (REAL restore
-  with manifest verification, path-traversal/symlink/duplicate refusal,
-  ZIP-bomb + disk-space guards, pre-restore auto-backup; the app's
-  embedded copy is byte-identical to this file), `sync_embedded.py`
+  (backup ZIP with SHA-256 manifest), `restore_studio.py` (REAL restore:
+  TWO-directional manifest verification, staged crash-safe extraction
+  with a checksummed recovery journal + single-restore lock + --recover
+  mode, path-traversal/symlink/duplicate refusal, ZIP-bomb + disk-space
+  guards, pre-restore auto-backup; the app's embedded copy is
+  byte-identical to this file), `sync_embedded.py`
   (packaging sync), `connectors/README.md` (modular API architecture -
   keys never live in code or this repo).
-- `security-test-20261113.log` / `integration-test-20261113.log` - raw
-  test evidence: ZIP attack suite (symlink, duplicates, bomb, disk
-  space, nested archives) and the export-restore byte-identity proof.
+- `security-test-20261113.log` / `integration-test-20261113.log` /
+  `fix2-verification-20261113.log` - raw test evidence: ZIP attack suite,
+  the export-restore byte-identity proof, and the fix-phase-2 crash /
+  journal / lock test battery (baseline hashes recorded first).
 - `NAS-STUDIO/` - the complete studio folder system: master control
   (TEST-REPORT-2026-11-13.md and PRODUCTION-READINESS.md - every feature
   labelled PASS / FAIL / PENDING honestly), Project 001 with all pilot
